@@ -1,4 +1,6 @@
-use std::collections::{HashMap, HashSet};
+#[cfg(windows)]
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::Path;
 
 use crate::error::KeychainError;

@@ -1,2 +1,2 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Keep text files byte-for-byte consistent across Windows and macOS checkouts.
+* text=auto eol=lf
