@@ -1,0 +1,20 @@
+---
+source: crates/wx-db/tests/snapshot-parsing.rs
+assertion_line: 145
+expression: result.messages
+---
+- sort_seq: 300
+  server_id: 900003
+  msg_type: 49
+  sub_type: 57
+  sender: wxid_test_alice
+  talker: wxid_test_bob
+  create_time: 1700000300
+  content:
+    Quote:
+      reply_text: I agree with this
+      refer_sender: Bob
+      refer_content: Shared article about testing
+      refer_type: 49
+      raw_xml: "<msg><appmsg><title>I agree with this</title><refermsg><fromusr>wxid_test_bob</fromusr><displayname>Bob</displayname><type>49</type><content><msg><appmsg><title>Shared article about testing</title><des>A comprehensive guide</des></appmsg></msg></content></refermsg></appmsg></msg>"
+  status: 0

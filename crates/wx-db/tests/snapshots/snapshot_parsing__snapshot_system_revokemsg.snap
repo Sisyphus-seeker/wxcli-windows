@@ -1,0 +1,45 @@
+---
+source: crates/wx-db/tests/snapshot-parsing.rs
+assertion_line: 187
+expression: result.messages
+---
+- sort_seq: 1
+  server_id: 100001
+  msg_type: 10000
+  sub_type: 0
+  sender: ""
+  talker: group_test@chatroom
+  create_time: 1700000001
+  content:
+    System: "\"测试用户A\" 撤回了一条消息"
+  status: 0
+- sort_seq: 2
+  server_id: 100002
+  msg_type: 10000
+  sub_type: 0
+  sender: ""
+  talker: group_test@chatroom
+  create_time: 1700000002
+  content:
+    System: "你邀请\"测试用户B\"加入了群聊"
+  status: 0
+- sort_seq: 3
+  server_id: 100003
+  msg_type: 10000
+  sub_type: 0
+  sender: ""
+  talker: wxid_test_private
+  create_time: 1700000003
+  content:
+    System: "\"测试用户C\" 撤回了一条消息"
+  status: 0
+- sort_seq: 4
+  server_id: 100004
+  msg_type: 10000
+  sub_type: 0
+  sender: ""
+  talker: group_test@chatroom
+  create_time: 1700000004
+  content:
+    System: "\"测试用户D\" 撤回了一条消息"
+  status: 0

@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - name: Package binary
+        shell: pwsh
+        run: |
+          $archive = "wx-cli-${{ github.ref_name }}-windows-x64.zip"
+          New-Item -ItemType Directory -Path package
+          Copy-Item "target/release/wx-cli.exe", "LICENSE", "README.md" -Destination package
+          Compress-Archive -Path "package/*" -DestinationPath $archive
+          $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $archive" | Set-Content "$archive.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: |
+            wx-cli-${{ github.ref_name }}-windows-x64.zip
+            wx-cli-${{ github.ref_name }}-windows-x64.zip.sha256
+
+  release:
+    needs: [build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v5
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Extract changelog
+        id: changelog
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BODY=$(awk "/^## \[${VERSION}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" CHANGELOG.md)
+          {
+            echo "body<<CHANGELOG_EOF"
+            echo "$BODY"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          body: ${{ steps.changelog.outputs.body }}

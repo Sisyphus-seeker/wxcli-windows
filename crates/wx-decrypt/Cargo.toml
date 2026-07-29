@@ -1,0 +1,15 @@
+[package]
+name = "wx-decrypt"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+aes = "0.9"
+cbc = "0.2"
+pbkdf2 = { version = "0.12", features = ["sha2"] }
+sha2 = "0.10"
+hmac = "0.12"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"

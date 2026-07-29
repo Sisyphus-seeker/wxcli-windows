@@ -1,0 +1,20 @@
+---
+source: crates/wx-db/tests/snapshot-parsing.rs
+assertion_line: 137
+expression: result.messages
+---
+- sort_seq: 200
+  server_id: 900002
+  msg_type: 49
+  sub_type: 5
+  sender: wxid_test_alice
+  talker: wxid_test_bob
+  create_time: 1700000200
+  content:
+    Link:
+      sub_type: 5
+      title: ~
+      des: ~
+      url: "https://example.com/test-link"
+      raw_xml: "<msg><appmsg><title>null</title><des>null</des><url>https://example.com/test-link</url><type>5</type></appmsg></msg>"
+  status: 0

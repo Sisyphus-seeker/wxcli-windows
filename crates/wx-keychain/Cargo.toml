@@ -1,0 +1,41 @@
+[package]
+name = "wx-keychain"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wx-decrypt = { path = "../wx-decrypt" }
+wx-paths = { path = "../wx-paths" }
+tokio = { version = "1", features = ["process", "time", "io-util", "rt-multi-thread", "macros"] }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+toml = "1.1"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+hex = "0.4"
+rusqlite = { version = "0.40", features = ["bundled"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+mach2 = "0.6"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security_Cryptography",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Kernel",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+aes = "0.9"
+cbc = "0.2"
+hmac = "0.12"
+sha2 = "0.10"
+tempfile = "3"

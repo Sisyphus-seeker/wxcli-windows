@@ -1,0 +1,15 @@
+---
+source: crates/wx-db/tests/snapshot-parsing.rs
+assertion_line: 169
+expression: result.messages
+---
+- sort_seq: 600
+  server_id: 900006
+  msg_type: 1
+  sub_type: 0
+  sender: wxid_test_bob
+  talker: group_test@chatroom
+  create_time: 1700000600
+  content:
+    Text: Hello from the group chat
+  status: 0

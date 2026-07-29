@@ -1,0 +1,24 @@
+[package]
+name = "wx-media"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+audio = ["dep:silk-rs"]
+
+[dependencies]
+aes = "0.9"
+ecb = "0.1"
+cipher = { version = "0.4", features = ["block-padding"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
+md5 = "0.7"
+base64 = "0.22"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+hex = "0.4"
+silk-rs = { version = "0.2", optional = true }
+wx-keychain = { path = "../wx-keychain" }
+
+[dev-dependencies]
+tempfile = "3"

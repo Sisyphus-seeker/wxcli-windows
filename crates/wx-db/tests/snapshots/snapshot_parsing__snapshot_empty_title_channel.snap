@@ -1,0 +1,18 @@
+---
+source: crates/wx-db/tests/snapshot-parsing.rs
+assertion_line: 153
+expression: result.messages
+---
+- sort_seq: 400
+  server_id: 900004
+  msg_type: 49
+  sub_type: 51
+  sender: wxid_test_alice
+  talker: wxid_test_bob
+  create_time: 1700000400
+  content:
+    ChannelVideo:
+      sub_type: 51
+      title: This is a channel video description
+      raw_xml: "<msg><appmsg><title></title><des>This is a channel video description</des><type>51</type></appmsg></msg>"
+  status: 0

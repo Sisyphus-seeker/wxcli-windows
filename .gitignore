@@ -1,0 +1,13 @@
+/target
+.venv*/
+__pycache__/
+*.py[cod]
+*.pdb
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.log
+keys.toml
+settings.toml
+.DS_Store
