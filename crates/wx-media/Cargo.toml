@@ -12,7 +12,7 @@ aes = "0.9"
 ecb = "0.1"
 cipher = { version = "0.4", features = ["block-padding"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
-md5 = "0.7"
+md5 = "0.8"
 base64 = "0.22"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
