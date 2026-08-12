@@ -68,6 +68,11 @@ macOS 密钥提取**需要 SIP 关闭**（SIP enabled 时 `task_for_pid` 被内�
 .\wx-cli.exe doctor
 ```
 
+> [!TIP]
+> GitHub 页面绿色 **Code → Download ZIP** 下载的是源码包，文件名通常类似
+> `wxcli-windows-main.zip`，里面不会包含 `wx-cli.exe`。普通用户请从
+> **Releases** 页面下载 `wx-cli-<版本>-windows-x64.zip`；只有开发者才需要下载源码包并自行编译。
+
 ### 从源码构建
 
 ```powershell
