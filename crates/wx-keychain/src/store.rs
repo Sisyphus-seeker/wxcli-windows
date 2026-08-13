@@ -1,11 +1,15 @@
 use std::collections::HashMap;
 use std::fs;
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::error::KeychainError;
+#[cfg(windows)]
+use windows_sys::Win32::Storage::FileSystem::{MoveFileExW, MOVEFILE_REPLACE_EXISTING};
 use wx_decrypt::{EncKeyPair, KeyMaterial};
 
 /// Serializable enc_key + salt pair for the new per-DB format.
@@ -100,10 +104,20 @@ impl KeyStore {
 
         let tmp_path = path.with_extension("toml.tmp");
         fs::write(&tmp_path, &content)?;
-        fs::rename(&tmp_path, path).inspect_err(|_| {
-            // Clean up the temp file on rename failure.
+        if let Err(replace_error) = replace_file(&tmp_path, path) {
+            // Windows can reject replacing an existing file even when the
+            // caller can still write to it. Fall back to a direct overwrite
+            // so key capture is not lost solely because atomic replacement
+            // was blocked by the filesystem.
+            if let Err(write_error) = fs::write(path, &content) {
+                let _ = fs::remove_file(&tmp_path);
+                return Err(KeychainError::Other(format!(
+                    "failed to replace {} ({replace_error}); direct write also failed: {write_error}",
+                    path.display()
+                )));
+            }
             let _ = fs::remove_file(&tmp_path);
-        })?;
+        }
 
         wx_paths::sudo::chown_to_sudo_user(path);
         if !parent_existed {
@@ -352,9 +366,43 @@ impl KeyStore {
     }
 }
 
+fn replace_file(source: &Path, destination: &Path) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        let source_wide: Vec<u16> = source
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let destination_wide: Vec<u16> = destination
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let replaced = unsafe {
+            MoveFileExW(
+                source_wide.as_ptr(),
+                destination_wide.as_ptr(),
+                MOVEFILE_REPLACE_EXISTING,
+            )
+        };
+        if replaced == 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        fs::rename(source, destination)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn test_old_keys_toml_without_nickname_base_wxid() {
@@ -388,6 +436,27 @@ base_wxid = "wxid_test"
         assert_eq!(key.nickname.as_deref(), Some("TestUser"));
         assert_eq!(key.base_wxid.as_deref(), Some("wxid_test"));
         assert_eq!(key.display_name(), "wxid_test_1234 (TestUser)");
+    }
+
+    #[test]
+    fn test_save_replaces_existing_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("keys.toml");
+
+        let mut first = KeyStore::default();
+        first.set("wxid_first", &"aa".repeat(32), "test", None, None);
+        first.save(&path).unwrap();
+
+        let mut second = KeyStore::default();
+        second.set("wxid_second", &"bb".repeat(32), "test", None, None);
+        second.save(&path).unwrap();
+
+        let loaded = KeyStore::load(&path).unwrap();
+        assert!(loaded.get("wxid_first").is_none());
+        assert_eq!(
+            loaded.get("wxid_second").map(|key| key.data_key.as_str()),
+            Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        );
     }
 
     #[test]

@@ -72,7 +72,7 @@ pub async fn cmd_key_extract(timeout_secs: u64) -> Result<(), Box<dyn std::error
 }
 
 #[cfg(windows)]
-pub async fn cmd_key_extract(timeout_secs: u64) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn cmd_key_extract(_timeout_secs: u64) -> Result<(), Box<dyn std::error::Error>> {
     let version = wx_keychain::installed_weixin_version()?;
     let accounts = wx_keychain::find_account_dirs()?;
     if accounts.is_empty() {
@@ -80,14 +80,13 @@ pub async fn cmd_key_extract(timeout_secs: u64) -> Result<(), Box<dyn std::error
     }
 
     let params = wx_decrypt::platform_default_params();
-    let timeout = std::time::Duration::from_secs(timeout_secs);
-    let results = match wx_keychain::find_weixin_pids() {
-        Ok(pids) => wx_keychain::capture_keys_windows_debug(&pids, &accounts, params, timeout)?,
-        Err(wx_keychain::KeychainError::WeChatNotRunning) => {
-            wx_keychain::launch_and_capture_keys_windows_debug(&accounts, params, timeout)?
-        }
-        Err(error) => return Err(error.into()),
-    };
+    let pids = wx_keychain::find_weixin_pids()?;
+    eprintln!(
+        "Scanning {} Weixin process{} for pre-derived database keys...",
+        pids.len(),
+        if pids.len() == 1 { "" } else { "es" }
+    );
+    let results = wx_keychain::capture_keys_windows(&pids, &accounts, params)?;
     persist_scan_results(results, &version)
 }
 

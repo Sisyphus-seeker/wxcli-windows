@@ -339,6 +339,16 @@ unsafe fn capture_launched_process(
             captured.len(),
         );
     }
+    if captured.is_empty() {
+        return Err(KeychainError::Other(format!(
+            "dynamic capture produced no validated key (breakpoint_hits={}, readable_salts={}, matched_salts={}, readable_keys={}, parsed_patterns={})",
+            stats.breakpoint_hits,
+            stats.readable_salts,
+            stats.matched_salts,
+            stats.readable_keys,
+            stats.parsed_patterns,
+        )));
+    }
     captured.sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
     captured.dedup();
     Ok(captured)
@@ -551,6 +561,16 @@ unsafe fn capture_attached_process(
             stats.parsed_patterns,
             captured.len(),
         );
+    }
+    if captured.is_empty() {
+        return Err(KeychainError::Other(format!(
+            "dynamic capture produced no validated key (breakpoint_hits={}, readable_salts={}, matched_salts={}, readable_keys={}, parsed_patterns={})",
+            stats.breakpoint_hits,
+            stats.readable_salts,
+            stats.matched_salts,
+            stats.readable_keys,
+            stats.parsed_patterns,
+        )));
     }
     captured.sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
     captured.dedup();
