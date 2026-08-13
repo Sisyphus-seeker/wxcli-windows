@@ -101,12 +101,50 @@ pub fn capture_keys_windows_debug(
         })
         .collect::<Vec<_>>();
     ranked_pids.sort_unstable_by(|a, b| b.cmp(a));
-    let Some((_, pid)) = ranked_pids.first().copied() else {
+    if ranked_pids.is_empty() {
         return Err(KeychainError::NoKeysFound);
-    };
+    }
 
-    eprintln!("Waiting for Weixin database activity (pid {pid})...");
-    let captured = capture_process(pid, &targets, params, timeout)?;
+    // Weixin 4.x is a multi-process application. The process with the largest
+    // readable address space is not necessarily the process that performs
+    // database key derivation, so try every readable candidate instead of
+    // failing after the first heuristic choice.
+    let started = Instant::now();
+    let per_process = timeout
+        .checked_div(ranked_pids.len() as u32)
+        .unwrap_or(timeout)
+        .max(Duration::from_secs(1));
+    let mut captured = Vec::new();
+    let mut errors = Vec::new();
+    for (_, pid) in ranked_pids {
+        let elapsed = started.elapsed();
+        let Some(remaining) = timeout.checked_sub(elapsed) else {
+            break;
+        };
+        if remaining.is_zero() {
+            break;
+        }
+
+        eprintln!("Waiting for Weixin database activity (pid {pid})...");
+        match capture_process(pid, &targets, params, per_process.min(remaining)) {
+            Ok(mut keys) => captured.append(&mut keys),
+            Err(error) => {
+                eprintln!("  pid {pid} capture skipped: {error}");
+                errors.push(format!("pid {pid}: {error}"));
+            }
+        }
+    }
+
+    captured.sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+    captured.dedup();
+    if captured.is_empty() && !errors.is_empty() {
+        return Err(KeychainError::Other(format!(
+            "no valid enc_key found in Weixin process memory; tried {} process{}:\n{}",
+            errors.len(),
+            if errors.len() == 1 { "" } else { "es" },
+            errors.join("\n")
+        )));
+    }
     aggregate_results(captured, &targets, accounts)
 }
 
