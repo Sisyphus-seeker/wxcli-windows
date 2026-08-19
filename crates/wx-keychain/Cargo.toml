@@ -37,5 +37,5 @@ windows-sys = { version = "0.61", features = [
 aes = "0.9"
 cbc = "0.2"
 hmac = "0.12"
-sha2 = "0.10"
+sha2 = "0.11"
 tempfile = "3"
