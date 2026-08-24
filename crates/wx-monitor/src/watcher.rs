@@ -239,7 +239,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // FSEvents on macOS temp dirs can be slow/flaky in CI
+    #[ignore] // Native filesystem events on temp dirs can be slow/flaky in CI
     fn notify_watcher_detects_modification() {
         let dir = tempfile::TempDir::new().unwrap();
         let file = dir.path().join("test.db");

@@ -220,31 +220,10 @@ pub fn open_fts_connection_with_key(
             .map_err(|e| ContextError::Sqlite(e.to_string()))?;
 
     if let Some(key) = raw_key {
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = key;
-            return Err(ContextError::Sqlite(
-                "direct encrypted FTS open is unavailable on this platform".into(),
-            ));
-        }
-
-        #[cfg(target_os = "macos")]
-        {
-            unsafe {
-                let rc = ffi::sqlite3_key(conn.handle(), key.as_ptr() as *const c_void, 32);
-                if rc != 0 {
-                    return Err(ContextError::Sqlite(format!("sqlite3_key failed: rc={rc}")));
-                }
-            }
-            conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| {
-                r.get::<_, i64>(0)
-            })
-            .map_err(|_| {
-                ContextError::Sqlite("incorrect key or not an encrypted FTS database".into())
-            })?;
-            conn.execute_batch("PRAGMA query_only = ON")
-                .map_err(|e| ContextError::Sqlite(e.to_string()))?;
-        }
+        let _ = key;
+        return Err(ContextError::Sqlite(
+            "direct encrypted FTS open is unavailable on Windows; decrypt to cache first".into(),
+        ));
     }
 
     register_mm_fts_tokenizer(&conn).map_err(ContextError::Sqlite)?;

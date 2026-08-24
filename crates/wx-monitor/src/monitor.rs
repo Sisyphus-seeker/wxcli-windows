@@ -16,12 +16,12 @@ use crate::watcher::{FileWatcher, NotifyWatcher, PollingWatcher};
 /// Watcher mode selection.
 #[derive(Debug, Clone, Default)]
 pub enum WatchMode {
-    /// Automatic: polling on macOS, fsnotify on other platforms.
+    /// Automatic: use Windows filesystem notifications.
     #[default]
     Auto,
     /// Force polling.
     Poll,
-    /// Force fsnotify (opt-in on macOS).
+    /// Force Windows filesystem notifications.
     Fsnotify,
 }
 
@@ -37,16 +37,7 @@ pub fn resolve_watch_mode(mode: &WatchMode) -> ResolvedWatcher {
     match mode {
         WatchMode::Poll => ResolvedWatcher::Polling,
         WatchMode::Fsnotify => ResolvedWatcher::Notify,
-        WatchMode::Auto => {
-            #[cfg(target_os = "macos")]
-            {
-                ResolvedWatcher::Polling
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                ResolvedWatcher::Notify
-            }
-        }
+        WatchMode::Auto => ResolvedWatcher::Notify,
     }
 }
 
@@ -55,7 +46,7 @@ pub struct MonitorConfig {
     pub encrypted_session_dir: PathBuf,
     pub key_material: KeyMaterial,
     pub params: &'static CryptoParams,
-    /// Watcher mode selection. Default: Auto (polling on macOS, fsnotify elsewhere).
+    /// Watcher mode selection. Default: Windows filesystem notifications.
     pub watch_mode: WatchMode,
     pub poll_interval: Duration,
     pub channel_capacity: usize,
@@ -374,18 +365,8 @@ mod tests {
         );
     }
 
-    #[cfg(target_os = "macos")]
     #[test]
-    fn watch_mode_auto_resolves_to_polling_on_macos() {
-        assert_eq!(
-            resolve_watch_mode(&WatchMode::Auto),
-            ResolvedWatcher::Polling
-        );
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    #[test]
-    fn watch_mode_auto_resolves_to_notify_on_non_macos() {
+    fn watch_mode_auto_resolves_to_notify_on_windows() {
         assert_eq!(
             resolve_watch_mode(&WatchMode::Auto),
             ResolvedWatcher::Notify

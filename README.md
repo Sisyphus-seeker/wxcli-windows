@@ -6,7 +6,7 @@
 > 这是基于 [pandorafuture/wx-cli](https://github.com/pandorafuture/wx-cli)
 > 二次开发的非官方 Windows 兼容发行版，不代表上游项目提供官方支持。
 
-wx-cli 直接读取 macOS 或 Windows 上的微信本地数据，让你和 Agent 都能访问自己的聊天记录、联系人、群聊和媒体消息。数据默认留在本机，不需要上传聊天数据库，也不依赖云端导出。
+wx-cli 直接读取 Windows 上的微信本地数据，让你和 Agent 都能访问自己的聊天记录、联系人、群聊和媒体消息。数据默认留在本机，不需要上传聊天数据库，也不依赖云端导出。
 
 ## 它能做什么
 
@@ -42,19 +42,10 @@ wx-cli 提供了最关键的两样东西：完整的历史上下文，以及持�
 ## 支持范围
 
 - **Windows**：x64，微信 4.1.11.x（已验证 4.1.11.24）
-- **macOS 源码兼容性**：继承自上游；本仓库 Release 不提供 macOS 二进制
 
 ## 前置条件
 
 Windows 需要 64 位微信和 64 位 `wx-cli`。密钥扫描会读取当前用户的微信进程内存；若 `doctor` 报权限不足，请从提升权限的终端运行。无需安装 OpenSSL、SQLCipher、FFmpeg 或 libclang 即可使用联系人、会话、消息和监控功能。
-
-macOS 密钥提取**需要 SIP 关闭**（SIP enabled 时 `task_for_pid` 被内核拒绝，即使 root 也不行），通常不需要 sudo。如果你已有密钥，可以跳过 SIP 要求，直接用 `key set` 手动录入。
-
-`key extract`（LLDB 方式）还需要：
-
-1. `sudo DevToolsSecurity -enable`
-2. `sudo dscl . append /Groups/_developer GroupMembership $USER`
-3. `xcode-select --install`（提供 `lldb` 和 `python3`）
 
 ## 安装
 
@@ -123,18 +114,15 @@ wx-cli doctor
 
 ### 2. 提取密钥
 
-```bash
-# macOS：LLDB hook 提取密钥，会重启 WeChat
-wx-cli key extract --timeout 120
-
-# Windows：扫描正在运行的微信进程内存，不会重启微信
+```powershell
+# 扫描正在运行的微信进程内存，不会重启微信
 wx-cli key extract
 
 # 查看已保存的密钥
 wx-cli key list
 ```
 
-macOS 的 `key extract` 通过 LLDB hook 捕获 PBKDF2 调用。Windows 的 `key extract` 等价于 `key scan`，扫描内存中的已派生数据库密钥并按数据库盐值保存；运行前请先登录微信。
+`key extract` 扫描 Windows 微信进程内存中的已派生数据库密钥，并按数据库盐值保存；运行前请先登录微信。
 
 手动设置密钥：
 
@@ -202,8 +190,8 @@ REST 端点：`/api/v1/health`、`/api/v1/sessions`、`/api/v1/contacts`、`/api
 | 命令 | 说明 |
 |------|------|
 | `wx-cli status` | 查看 WeChat 运行状态 |
-| `wx-cli doctor` | 检查环境（SIP 等） |
-| `wx-cli key extract` | 按平台提取或扫描数据库密钥 |
+| `wx-cli doctor` | 检查 Windows 微信、路径和进程权限 |
+| `wx-cli key extract` | 扫描 Windows 微信数据库密钥 |
 | `wx-cli key list` | 查看已保存密钥 |
 | `wx-cli key set <account> <key>` | 手动设置密钥 |
 | `wx-cli key set-image <account> <image-key>` | 手动设置图片密钥 |
@@ -226,7 +214,7 @@ REST 端点：`/api/v1/health`、`/api/v1/sessions`、`/api/v1/contacts`、`/api
 
 按账号隐藏指定联系人、群聊或带特定标签的联系人。启用后，查询、导出、监控等命令默认应用隐藏规则（全文搜索除外）。
 
-配置文件：macOS 为 `~/Library/Application Support/wx-cli/config/settings.toml`，Windows 为 `%APPDATA%\wx-cli\settings.toml`。
+配置文件位于 `%APPDATA%\wx-cli\settings.toml`。
 
 ```toml
 [accounts."<account_id>"]
@@ -238,17 +226,15 @@ ignore_tags = ["同事", "客户"]
 
 ## 文件路径
 
-| 类别 | 路径（macOS） | 用途 | 可删除？ |
-|------|---------------|------|----------|
-| Config | `~/Library/Application Support/wx-cli/config/` | 密钥、设置 | 否（先备份） |
-| Cache | `~/Library/Caches/wx-cli/` | 解密后数据库 | 可（重新 decrypt） |
-| State | `~/Library/Application Support/wx-cli/state/` | 服务运行时元数据 | 可 |
-| Logs | `~/Library/Logs/wx-cli/` | 服务日志 | 可 |
-| Temp | `$TMPDIR/wx-cli/` | 密钥提取临时文件 | 可 |
+| 类别 | Windows 路径 | 用途 | 可删除？ |
+|------|--------------|------|----------|
+| Config | `%APPDATA%\wx-cli` | 密钥、设置 | 否（先备份） |
+| Cache | `%LOCALAPPDATA%\wx-cli` | 解密后数据库 | 可（重新 decrypt） |
+| State | `%LOCALAPPDATA%\wx-cli\state` | 服务运行时元数据 | 可 |
+| Logs | `%LOCALAPPDATA%\wx-cli\logs` | 服务日志 | 可 |
+| Temp | `%TEMP%\wx-cli` | 临时文件 | 可 |
 
-使用 `wx-cli paths` 查看所有路径。清理缓存：`rm -rf ~/Library/Caches/wx-cli/`。
-
-Windows 的配置位于 `%APPDATA%\wx-cli`，缓存、状态和日志位于 `%LOCALAPPDATA%\wx-cli`。实际路径以 `wx-cli paths` 输出为准。
+实际路径以 `wx-cli paths` 输出为准。
 
 ## 项目结构
 
@@ -256,7 +242,7 @@ Windows 的配置位于 `%APPDATA%\wx-cli`，缓存、状态和日志位于 `%LO
 wx-cli/
 ├── crates/
 │   ├── wx-decrypt/     # 核心解密库（KDF、逐页解密、整库解密）
-│   ├── wx-keychain/    # 密钥提取（LLDB/Windows 内存扫描）与本地存储
+│   ├── wx-keychain/    # Windows 内存密钥扫描与本地存储
 │   ├── wx-cli/         # CLI 入口
 │   ├── wx-db/          # 数据库查询（联系人、消息、会话、群聊）
 │   ├── wx-media/       # 媒体解密（图片、语音、视频）
@@ -270,12 +256,29 @@ wx-cli/
 ### `key extract` 超时
 
 - 确认 WeChat 已弹出登录界面并完成登录
-- macOS 可增加超时：`--timeout 300`，并检查 `$TMPDIR/wx-cli/lldb/wx_cli_lldb_output.txt`
 - Windows 请运行 `wx-cli doctor` 检查进程内存读取权限，并确认 `WX_CLI_WECHAT_DATA_DIR` 指向正确的数据根目录
 
-### SIP / DevToolsSecurity 报错
+### 查询回退到旧缓存并显示 `os error 5`
 
-此项仅适用于 macOS。密钥提取需要 SIP 关闭；重启进入恢复模式执行 `csrutil disable`，然后运行 `wx-cli doctor` 逐项检查。
+`query`、`sessions` 和 `search` 会把实时数据库解密到
+`%LOCALAPPDATA%\wx-cli`。如果命令运行在 Codex 等带文件沙箱的 Agent 环境中，进程可能能读取
+`xwechat_files`，却不能更新这个缓存目录。典型现象是：
+
+```text
+warning: database refresh failed; querying stale cache
+decrypt err message\message_0.db: I/O error: 拒绝访问。 (os error 5)
+warning: failed to write shard metadata sidecar: 拒绝访问。 (os error 5)
+```
+
+这类错误不一定表示微信数据库 ACL 有问题，也不一定需要管理员权限。建议按以下顺序处理：
+
+1. 运行 `wx-cli paths --json`，确认 `cache_root`。
+2. 允许当前 Agent/沙箱中的 `wx-cli query` 命令访问并写入该缓存目录，然后重试。
+3. 检查输出中的最新 `create_time` 和 `paging.returned`，不要仅凭退出码 `0` 判断刷新成功；回退旧缓存时命令仍可能成功退出。
+4. 在普通 PowerShell 中直接重试。只有普通 PowerShell 也出现访问拒绝时，才改用管理员 PowerShell。
+5. 若管理员 PowerShell 仍失败，再完全退出微信后重试，并检查数据目录及缓存目录 ACL。
+
+`no matching enc_key found` 是另一类问题：先确认微信正在运行，再执行 `wx-cli key extract`，然后重新查询。联系人库缺少 key 时仍可能读取文本消息，但昵称会显示为 wxid/raw id。
 
 ### 解密后数据库无法打开
 

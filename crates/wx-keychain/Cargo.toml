@@ -15,12 +15,6 @@ thiserror = "2"
 hex = "0.4"
 rusqlite = { version = "0.40", features = ["bundled"] }
 
-[target.'cfg(target_os = "macos")'.dependencies]
-mach2 = "0.6"
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
-
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",

@@ -34,7 +34,7 @@ use windows_sys::Win32::System::Threading::{
 };
 
 use crate::error::KeychainError;
-use crate::mach_vm::{self, MemoryCaptureResult, MemoryReader};
+use crate::memory_scan::{self, MemoryCaptureResult, MemoryReader};
 use crate::process::AccountDirInfo;
 use crate::windows::{installed_weixin_version, WindowsMemoryReader};
 use wx_decrypt::{CryptoParams, EncKeyPair, KeyMaterial};
@@ -358,7 +358,7 @@ fn collect_targets(accounts: &[AccountDirInfo], params: &CryptoParams) -> Vec<Db
     let mut targets = Vec::new();
     for (account_index, account) in accounts.iter().enumerate() {
         let db_storage = account.data_dir.join("db_storage");
-        for path in mach_vm::find_db_files(&db_storage) {
+        for path in memory_scan::find_db_files(&db_storage) {
             let Ok(data) = wx_decrypt::read_prefix_shared(&path, params.page_size) else {
                 continue;
             };
@@ -614,7 +614,7 @@ fn capture_context(
     stats.readable_keys += 1;
 
     for value in [key_bytes.clone(), unmask_key_buffer(&key_bytes)] {
-        for found in mach_vm::scan_chunk(&value) {
+        for found in memory_scan::scan_chunk(&value) {
             stats.parsed_patterns += 1;
             let hex_password = hex::encode(found.enc_key);
             let mut candidates = vec![

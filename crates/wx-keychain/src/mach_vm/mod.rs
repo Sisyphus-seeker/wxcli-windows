@@ -2,15 +2,9 @@ pub mod pattern;
 pub mod reader;
 pub mod scanner;
 
-#[cfg(target_os = "macos")]
-pub mod mach_reader;
-
 pub use pattern::{scan_chunk, FoundKey};
 pub use reader::{MemRegion, MemoryReader};
 pub use scanner::{MemoryScanner, ScanResult};
-
-#[cfg(target_os = "macos")]
-pub use mach_reader::MachVmReader;
 
 use crate::error::KeychainError;
 use crate::process::AccountDirInfo;
@@ -24,9 +18,6 @@ pub struct MemoryCaptureResult {
     pub key_material: KeyMaterial,
     pub matched_account: AccountDirInfo,
 }
-
-#[cfg(target_os = "macos")]
-pub type MachCaptureResult = MemoryCaptureResult;
 
 /// Recursively find all `.db` files under a directory.
 pub(crate) fn find_db_files(dir: &std::path::Path) -> Vec<PathBuf> {
@@ -48,19 +39,9 @@ pub(crate) fn find_db_files(dir: &std::path::Path) -> Vec<PathBuf> {
 
 /// Scan WeChat process memory for pre-derived encryption keys.
 ///
-/// Attaches to the process via `task_for_pid`, enumerates RW regions, scans for
+/// Attaches through a platform reader, enumerates RW regions, scans for
 /// `x'<enc_key><salt>'` patterns, matches each candidate's salt against the
 /// provided account DBs, and HMAC-validates before returning.
-#[cfg(target_os = "macos")]
-pub fn capture_key_mach(
-    pid: u32,
-    accounts: &[AccountDirInfo],
-    params: &wx_decrypt::CryptoParams,
-) -> Result<Vec<MachCaptureResult>, KeychainError> {
-    let reader = MachVmReader::attach(pid)?;
-    capture_keys_with_reader(reader, accounts, params)
-}
-
 /// Scan a process through a platform-specific reader and aggregate validated keys by account.
 pub fn capture_keys_with_reader<R: MemoryReader>(
     reader: R,

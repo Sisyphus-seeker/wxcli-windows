@@ -17,7 +17,7 @@ use windows_sys::Win32::System::Threading::{
 };
 
 use crate::error::KeychainError;
-use crate::mach_vm::{self, MemRegion, MemoryCaptureResult, MemoryReader};
+use crate::memory_scan::{self, MemRegion, MemoryCaptureResult, MemoryReader};
 use crate::process::AccountDirInfo;
 use crate::PreflightCheck;
 use wx_decrypt::{EncKeyPair, KeyMaterial};
@@ -280,7 +280,7 @@ pub fn capture_key_windows(
     params: &wx_decrypt::CryptoParams,
 ) -> Result<Vec<MemoryCaptureResult>, KeychainError> {
     let reader = WindowsMemoryReader::open(pid)?;
-    mach_vm::capture_keys_with_reader(reader, accounts, params)
+    memory_scan::capture_keys_with_reader(reader, accounts, params)
 }
 
 pub fn capture_keys_windows(

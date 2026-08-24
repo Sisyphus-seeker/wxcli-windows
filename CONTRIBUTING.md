@@ -32,7 +32,7 @@ cargo clippy -- -D warnings
 Open an [issue](https://github.com/Sisyphus-seeker/wxcli-windows/issues) with:
 
 - wx-cli version (`wx-cli --version`)
-- Windows or macOS version
+- Windows version and architecture
 - WeChat version
 - Steps to reproduce
 - Expected vs actual behavior

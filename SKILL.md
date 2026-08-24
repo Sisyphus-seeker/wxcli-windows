@@ -1,13 +1,13 @@
 ---
 name: wx-cli
-description: Use when the user asks about their WeChat messages, contacts, conversations, chat history, or needs to decrypt/search local WeChat data on Windows or macOS. Provides structured wx-cli commands for encrypted database access, querying, export, monitoring, and local API use.
+description: Use when the user asks about their WeChat messages, contacts, conversations, chat history, or needs to decrypt/search local WeChat data on Windows. Provides structured wx-cli commands for encrypted database access, querying, export, monitoring, and local API use.
 ---
 
 # wx-cli — WeChat 数据查询工具
 
 ## Overview
 
-`wx-cli` 解密并查询 Windows 或 macOS 上的微信加密数据库。默认自动检测账号、密钥和数据目录。
+`wx-cli` 解密并查询 Windows 上的微信加密数据库。默认自动检测账号、密钥和数据目录。
 
 **核心原则：** 用 `--format json` 获取结构化数据供分析；用默认 text 格式展示给用户。
 
@@ -71,8 +71,6 @@ description: Use when the user asks about their WeChat messages, contacts, conve
 
 - **Windows**：使用 64 位微信和 64 位 `wx-cli`，先登录微信；运行
   `wx-cli doctor` 检查进程、版本、数据目录和内存读取权限。只有出现访问拒绝时才考虑提升终端权限。
-- **macOS**：LLDB 密钥提取需要禁用 SIP；检查 `csrutil status`，并仅在理解风险后于
-  Recovery Mode 执行 `csrutil disable`。
 
 ## 常用工作流
 
@@ -81,14 +79,11 @@ description: Use when the user asks about their WeChat messages, contacts, conve
 WeChat 数据库是加密的，查询前必须先有密钥：
 
 ```powershell
-# Windows：扫描已登录微信进程中的数据库密钥材料，不重启微信
+# 扫描已登录微信进程中的数据库密钥材料，不重启微信
 wx-cli key extract
-
-# macOS：LLDB hook，会重启 WeChat，并需要 LLDB、python3 和已禁用的 SIP
-wx-cli key extract --timeout 120
 ```
 
-Windows 会按真实数据库盐值保存已验证的密钥材料；macOS 可提取完整数据库密钥。后续多数查询可直接读取加密数据库，无需先执行 `decrypt`。
+Windows 会按真实数据库盐值保存已验证的密钥材料。后续查询通过解密缓存读取数据库。
 
 提取后验证：
 
@@ -114,7 +109,7 @@ wx-cli key set-image <account_id> abcdefghijklmnop     # 图片 AES 密钥（V2 
 
 | 密钥 | 用途 | 提取方式 | 覆盖范围 |
 |------|------|---------|---------|
-| 数据库密钥材料 | 解密 SQLite 数据库 | Windows 内存扫描或 macOS LLDB hook | 按平台和数据库盐值验证 |
+| 数据库密钥材料 | 解密 SQLite 数据库 | Windows 进程内存扫描 | 按数据库盐值验证 |
 | Image key（16 bytes） | 解密 V2 格式 `.dat` 图片 | `key set-image` 显式设置；部分目录可自动推导 | 图片媒体 |
 
 ### 1. 查看最近聊天
@@ -139,8 +134,7 @@ wx-cli query 张三 --format json --limit 50
 
 ### 2a. 联系人隐藏规则
 
-配置文件：Windows 为 `%APPDATA%\wx-cli\settings.toml`，macOS 为
-`~/Library/Application Support/wx-cli/config/settings.toml`。
+配置文件为 `%APPDATA%\wx-cli\settings.toml`。
 
 ```toml
 [accounts."<account_id>"]
@@ -298,14 +292,17 @@ wx-cli doctor --fix      # 对 FAIL 项输出修复命令
 
 ```bash
 wx-cli status                           # 1. 确认 WeChat 状态
-wx-cli key extract                      # 2. Windows 扫描；macOS 可增加 --timeout 120
+wx-cli key extract                      # 2. 扫描 Windows 微信进程
 wx-cli key list                         # 3. 验证密钥
 wx-cli sessions                         # 4. 重试查询
 ```
 
 **`OpenProcess failed: Access is denied`** — Windows 进程读取权限不足；确认微信与终端属于同一用户，必要时使用提升权限的终端。
 
-**`task_for_pid failed (kern_return=5)`** — macOS SIP 启用；仅在理解系统安全影响后决定是否于 Recovery Mode 禁用。
+**`database refresh failed; querying stale cache` 与 `os error 5`** — 先运行
+`wx-cli paths --json` 查看缓存目录。若处于 Codex 等文件沙箱环境，应请求仅对 wx-cli 查询命令开放本地执行，使其可以更新 `%LOCALAPPDATA%\wx-cli`；不要直接把错误归因于微信数据库或要求管理员权限。重试后核对最新 `create_time`。普通 PowerShell 仍失败时，才升级到管理员 PowerShell。
+
+**`no matching enc_key found`** — 与缓存写权限不同。确认微信正在运行，执行 `wx-cli key extract`，再重新查询。只有联系人或媒体数据库缺 key 时，可以继续汇总文本并注明昵称/媒体解析不完整。
 
 **`warning: ffmpeg not found`** — 安装 FFmpeg 并加入 PATH，或设置 `FFMPEG_PATH`。
 
@@ -369,13 +366,13 @@ JSON `content` 字段为 tagged union：外层 key 是变体名，值是结构�
 
 ## 文件路径
 
-| 类别 | Windows | macOS | 用途 |
-|------|---------|-------|------|
-| Config | `%APPDATA%\wx-cli` | `~/Library/Application Support/wx-cli/config/` | 密钥、设置 |
-| Cache | `%LOCALAPPDATA%\wx-cli` | `~/Library/Caches/wx-cli/` | 解密后数据库 |
-| State | `%LOCALAPPDATA%\wx-cli` | `~/Library/Application Support/wx-cli/state/` | 服务运行时 |
-| Logs | `%LOCALAPPDATA%\wx-cli` | `~/Library/Logs/wx-cli/` | 服务日志 |
-| Temp | `%TEMP%\wx-cli` | `$TMPDIR/wx-cli/` | 临时文件 |
+| 类别 | Windows | 用途 |
+|------|---------|------|
+| Config | `%APPDATA%\wx-cli` | 密钥、设置 |
+| Cache | `%LOCALAPPDATA%\wx-cli` | 解密后数据库 |
+| State | `%LOCALAPPDATA%\wx-cli\state` | 服务运行时 |
+| Logs | `%LOCALAPPDATA%\wx-cli\logs` | 服务日志 |
+| Temp | `%TEMP%\wx-cli` | 临时文件 |
 
 使用 `wx-cli paths` 查看所有路径。
 

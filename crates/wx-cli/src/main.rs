@@ -17,7 +17,7 @@ pub(crate) mod visibility_projection;
 #[derive(Parser)]
 #[command(
     name = "wx-cli",
-    about = "WeChat database decryption tool (macOS 4.1.x)"
+    about = "Local WeChat database decryption and query tool for Windows"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -111,7 +111,7 @@ enum Commands {
         #[arg(long, conflicts_with = "fsnotify")]
         poll: bool,
 
-        /// Force fsnotify backend (opt-in on macOS, where polling is the default)
+        /// Force the native filesystem notification backend
         #[arg(long, conflicts_with = "poll")]
         fsnotify: bool,
 

@@ -15,10 +15,6 @@ dashmap = "6"
 rayon = "1"
 rust-stemmers = "1"
 
-[target.'cfg(target_os = "macos")'.dependencies]
-rusqlite = { version = "0.40", features = ["bundled-sqlcipher"] }
-
-[target.'cfg(not(target_os = "macos"))'.dependencies]
 rusqlite = { version = "0.40", features = ["bundled"] }
 
 [dev-dependencies]

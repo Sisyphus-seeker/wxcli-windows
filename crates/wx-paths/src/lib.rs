@@ -88,8 +88,7 @@ impl AppPaths {
 
     /// Config directory.
     ///
-    /// macOS: `~/Library/Application Support/wx-cli/config/`
-    /// Linux: `~/.config/wx-cli/`
+    /// Windows: `%APPDATA%/wx-cli/`
     pub fn config_dir(&self) -> PathBuf {
         self.config_root.clone()
     }
@@ -106,7 +105,7 @@ impl AppPaths {
 
     // ── Cache ──
 
-    /// Cache root: `~/Library/Caches/wx-cli/` (macOS)
+    /// Windows cache root under `%LOCALAPPDATA%/wx-cli/`.
     pub fn cache_root(&self) -> &Path {
         &self.cache_root
     }
@@ -123,7 +122,7 @@ impl AppPaths {
 
     // ── State ──
 
-    /// State root: `~/Library/Application Support/wx-cli/state/` (macOS)
+    /// Windows state root under `%LOCALAPPDATA%/wx-cli/state/`.
     pub fn state_root(&self) -> &Path {
         &self.state_root
     }
@@ -156,7 +155,7 @@ impl AppPaths {
 
     // ── Logs ──
 
-    /// Logs directory: `~/Library/Logs/wx-cli/` (macOS)
+    /// Windows logs directory under `%LOCALAPPDATA%/wx-cli/logs/`.
     pub fn logs_dir(&self) -> &Path {
         &self.logs_root
     }
@@ -204,18 +203,6 @@ impl AppPaths {
         std::env::temp_dir().join("wx-cli")
     }
 
-    /// `<temp_root>/lldb/wechat_capture_key.py`
-    pub fn lldb_script_file() -> PathBuf {
-        Self::temp_root().join("lldb").join("wechat_capture_key.py")
-    }
-
-    /// `<temp_root>/lldb/wechat_lldb_output.txt`
-    pub fn lldb_output_file() -> PathBuf {
-        Self::temp_root()
-            .join("lldb")
-            .join("wechat_lldb_output.txt")
-    }
-
     /// `<temp_root>/nickname/<pid>_<nanos>.db`
     pub fn nickname_temp_db(pid: u32, nanos: u128) -> PathBuf {
         Self::temp_root()
@@ -243,22 +230,7 @@ impl AppPaths {
 
     /// Current platform identifier.
     pub fn platform() -> &'static str {
-        #[cfg(target_os = "macos")]
-        {
-            "macos"
-        }
-        #[cfg(target_os = "linux")]
-        {
-            "linux"
-        }
-        #[cfg(target_os = "windows")]
-        {
-            "windows"
-        }
-        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-        {
-            "unknown"
-        }
+        "windows"
     }
 
     /// Build a summary of all paths.
@@ -313,16 +285,6 @@ mod tests {
             "temp_root should end with wx-cli: {:?}",
             temp
         );
-    }
-
-    #[test]
-    fn lldb_files_under_temp_root() {
-        let script = AppPaths::lldb_script_file();
-        let output = AppPaths::lldb_output_file();
-        assert!(script.starts_with(AppPaths::temp_root()));
-        assert!(output.starts_with(AppPaths::temp_root()));
-        assert!(script.to_str().unwrap().ends_with("wechat_capture_key.py"));
-        assert!(output.to_str().unwrap().ends_with("wechat_lldb_output.txt"));
     }
 
     #[test]
@@ -441,60 +403,5 @@ mod tests {
         assert!(result.is_ok());
         assert!(tmp.is_dir());
         let _ = std::fs::remove_dir_all(&tmp);
-    }
-
-    #[cfg(target_os = "macos")]
-    mod macos_tests {
-        use super::*;
-
-        #[test]
-        fn macos_config_under_application_support() {
-            let ap = AppPaths::new().unwrap();
-            let config = ap.config_dir();
-            assert!(
-                config
-                    .to_str()
-                    .unwrap()
-                    .contains("Application Support/wx-cli/config"),
-                "macOS config should be under Application Support: {:?}",
-                config
-            );
-        }
-
-        #[test]
-        fn macos_cache_under_library_caches() {
-            let ap = AppPaths::new().unwrap();
-            let cache = ap.cache_root();
-            assert!(
-                cache.to_str().unwrap().contains("Library/Caches/wx-cli"),
-                "macOS cache should be under Library/Caches: {:?}",
-                cache
-            );
-        }
-
-        #[test]
-        fn macos_state_under_application_support() {
-            let ap = AppPaths::new().unwrap();
-            let state = ap.state_root();
-            assert!(
-                state
-                    .to_str()
-                    .unwrap()
-                    .contains("Application Support/wx-cli/state"),
-                "macOS state should be under Application Support: {:?}",
-                state
-            );
-        }
-
-        #[test]
-        fn macos_logs_under_library_logs() {
-            let ap = AppPaths::new().unwrap();
-            let logs = ap.logs_dir();
-            assert!(
-                logs.to_str().unwrap().contains("Library/Logs/wx-cli"),
-                "macOS logs should be under Library/Logs: {:?}",
-                logs
-            );
-        }
     }
 }

@@ -59,7 +59,7 @@ pub(crate) fn ensure_config_migrated(
 
 /// Chown all path segments from the new config root up to (but not including)
 /// the home directory. This ensures intermediate directories created under
-/// sudo (e.g. ~/Library/Application Support/wx-cli/) are owned by the
+/// an elevated shell are owned by the
 /// real user.
 fn chown_config_tree(home: &Path, config_root: &Path) {
     let mut current = config_root.to_path_buf();

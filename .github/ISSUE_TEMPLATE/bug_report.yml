@@ -13,8 +13,8 @@ body:
   - type: input
     id: macos-version
     attributes:
-      label: macOS version
-      placeholder: "macOS 15.5 (Apple Silicon)"
+      label: Windows and WeChat version
+      placeholder: "Windows 11 x64, WeChat 4.1.11.24"
     validations:
       required: true
   - type: input

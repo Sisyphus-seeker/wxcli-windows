@@ -1,26 +1,14 @@
 use std::path::{Path, PathBuf};
-#[cfg(target_os = "macos")]
-use std::process::Command;
 
 use crate::error::KeychainError;
 
-#[cfg(target_os = "macos")]
-pub const SUPPORTED_VERSION: &str = "4.1.8.21";
-#[cfg(windows)]
 pub const SUPPORTED_VERSION: &str = "4.1.11.24";
-#[cfg(not(any(target_os = "macos", windows)))]
-pub const SUPPORTED_VERSION: &str = "unsupported";
 
-/// Version prefixes accepted for LLDB key extraction.
+/// Version prefixes accepted for Windows process-memory key extraction.
 /// Encryption params (PBKDF2-HMAC-SHA512, 256K iterations) are identical across these versions.
-#[cfg(target_os = "macos")]
-const EXTRACTION_VERSION_PREFIXES: &[&str] = &["4.1.7", "4.1.8"];
-#[cfg(windows)]
 const EXTRACTION_VERSION_PREFIXES: &[&str] = &["4.1.11"];
-#[cfg(not(any(target_os = "macos", windows)))]
-const EXTRACTION_VERSION_PREFIXES: &[&str] = &[];
 
-/// Check whether a version string is compatible with our LLDB key extraction.
+/// Check whether a version string is compatible with Windows key extraction.
 fn is_extraction_compatible(version: &str) -> bool {
     EXTRACTION_VERSION_PREFIXES
         .iter()
@@ -97,34 +85,7 @@ pub fn extract_base_wxid_for_account_dir_under_root(
 /// Uses `pgrep` to find the PID and checks the installed WeChat version.
 /// Does NOT use `lsof` — suitable for commands that only need PID + version.
 pub fn find_wechat_pid() -> Result<(u32, String), KeychainError> {
-    #[cfg(target_os = "macos")]
-    let pgrep_output = Command::new("pgrep").args(["-x", "WeChat"]).output()?;
-
-    #[cfg(target_os = "macos")]
-    let pid = {
-        if !pgrep_output.status.success() {
-            return Err(KeychainError::WeChatNotRunning);
-        }
-
-        let pid_str = String::from_utf8_lossy(&pgrep_output.stdout)
-            .lines()
-            .next()
-            .unwrap_or("")
-            .trim()
-            .to_string();
-
-        pid_str
-            .parse()
-            .map_err(|_| KeychainError::WeChatNotRunning)?
-    };
-
-    #[cfg(windows)]
     let pid = crate::windows::find_weixin_pid()?;
-
-    #[cfg(not(any(target_os = "macos", windows)))]
-    return Err(KeychainError::Other(
-        "WeChat process detection is unsupported on this platform".into(),
-    ));
 
     let version = ensure_supported_wechat_version()?;
 
@@ -142,34 +103,7 @@ pub fn ensure_supported_wechat_version() -> Result<String, KeychainError> {
 
 /// Get WeChat version from the application bundle.
 fn get_wechat_version() -> Result<String, KeychainError> {
-    #[cfg(target_os = "macos")]
-    {
-        let output = Command::new("defaults")
-            .args([
-                "read",
-                "/Applications/WeChat.app/Contents/Info.plist",
-                "CFBundleShortVersionString",
-            ])
-            .output()?;
-
-        if !output.status.success() {
-            return Err(KeychainError::Other(
-                "failed to read WeChat version from Info.plist".into(),
-            ));
-        }
-
-        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
-    }
-
-    #[cfg(windows)]
-    {
-        return crate::windows::installed_weixin_version();
-    }
-
-    #[allow(unreachable_code)]
-    Err(KeychainError::Other(
-        "WeChat version detection is unsupported on this platform".into(),
-    ))
+    crate::windows::installed_weixin_version()
 }
 
 /// Shared config directory resolved by `AppPaths`.
@@ -181,32 +115,16 @@ pub fn config_dir() -> Result<PathBuf, KeychainError> {
 /// Default xwechat_files base path.
 fn default_xwechat_files_base() -> Result<PathBuf, KeychainError> {
     let ap = wx_paths::AppPaths::new().map_err(|e| KeychainError::Other(e.to_string()))?;
-    #[cfg(target_os = "macos")]
-    {
-        Ok(ap
-            .home()
-            .join("Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files"))
-    }
-
-    #[cfg(windows)]
-    {
-        crate::windows::find_xwechat_files_root(ap.home()).ok_or_else(|| {
-            KeychainError::Other(
-                "xwechat_files not found; use --data-dir or set WX_CLI_WECHAT_DATA_DIR".into(),
-            )
-        })
-    }
-
-    #[cfg(not(any(target_os = "macos", windows)))]
-    Err(KeychainError::Other(
-        "automatic WeChat data discovery is unsupported on this platform".into(),
-    ))
+    crate::windows::find_xwechat_files_root(ap.home()).ok_or_else(|| {
+        KeychainError::Other(
+            "xwechat_files not found; use --data-dir or set WX_CLI_WECHAT_DATA_DIR".into(),
+        )
+    })
 }
 
 /// Detect account directories from the filesystem (without WeChat running).
 ///
-/// Scans `~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/`
-/// for subdirectories containing `db_storage/message/message_0.db`.
+/// Scans the detected Windows `xwechat_files` root for account databases.
 pub fn find_account_dirs() -> Result<Vec<AccountDirInfo>, KeychainError> {
     let base = default_xwechat_files_base()?;
     if !base.exists() {
@@ -248,21 +166,7 @@ pub fn is_xwechat_files_root(path: &Path) -> bool {
 /// Unlike `find_wechat_pid()`, this does NOT perform version validation,
 /// so it won't block commands (sessions, query, etc.) that don't depend on version.
 fn is_wechat_running() -> bool {
-    #[cfg(target_os = "macos")]
-    {
-        Command::new("pgrep")
-            .args(["-x", "WeChat"])
-            .output()
-            .is_ok_and(|o| o.status.success())
-    }
-
-    #[cfg(windows)]
-    {
-        crate::windows::find_weixin_pid().is_ok()
-    }
-
-    #[cfg(not(any(target_os = "macos", windows)))]
-    false
+    crate::windows::find_weixin_pid().is_ok()
 }
 
 /// Detect the currently active WeChat account.

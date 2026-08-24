@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-08-24
+
+### Windows-only release
+
+- Adopt standard SemVer without a platform prerelease suffix
+- Remove macOS LLDB, Mach process access, dependencies, CI jobs, tests, paths, and user documentation
+- Keep and rename the shared process-memory scanner used by Windows key extraction
+- Keep Windows x64 support for WeChat 4.1.11.x, verified with 4.1.11.24
+
 ## [0.7.4-windows.1] - 2026-07-29
 
 ### Windows compatibility

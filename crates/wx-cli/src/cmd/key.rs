@@ -1,77 +1,4 @@
-#[cfg(target_os = "macos")]
-use std::time::Duration;
-
 use crate::util::{lookup_or_resolve_nickname, parse_hex_key_32};
-
-#[cfg(target_os = "macos")]
-pub async fn cmd_key_extract(timeout_secs: u64) -> Result<(), Box<dyn std::error::Error>> {
-    eprintln!("Running pre-flight checks...");
-    wx_keychain::preflight_checks()?;
-    eprintln!("  All checks passed.");
-
-    let version = wx_keychain::ensure_supported_wechat_version()?;
-    eprintln!("  WeChat version: {version}");
-
-    let accounts = wx_keychain::find_account_dirs()?;
-    if accounts.is_empty() {
-        return Err("no WeChat account directories found".into());
-    }
-
-    let mut store = wx_keychain::KeyStore::load_default()?;
-    let mut store_dirty = false;
-
-    eprintln!("Detected accounts:");
-    for a in &accounts {
-        let nick = lookup_or_resolve_nickname(&mut store, a);
-        if nick.is_some() {
-            store_dirty = true;
-        }
-        eprintln!(
-            "  {} ({})",
-            a.account_id,
-            nick.unwrap_or_else(|| "昵称未知".to_string())
-        );
-    }
-    if store_dirty {
-        store.save_default()?;
-    }
-
-    let result = wx_keychain::capture_key(&accounts, Duration::from_secs(timeout_secs)).await?;
-
-    let matched = &result.matched_account;
-    let hex_key = hex::encode(result.raw_key);
-    eprintln!("Key captured after {} PBKDF2 calls.", result.call_count);
-    eprintln!("Matched account: {}", matched.account_id);
-    println!("{hex_key}");
-
-    let nickname = wx_keychain::resolve_nickname(
-        &matched.data_dir,
-        &wx_decrypt::KeyMaterial::RawKey(result.raw_key),
-        &matched.base_wxid,
-    )
-    .unwrap_or_else(|e| {
-        eprintln!("  Warning: nickname resolution failed: {e}");
-        None
-    });
-
-    if let Some(ref n) = nickname {
-        eprintln!("Account nickname: {n}");
-    }
-
-    store.set(
-        &matched.account_id,
-        &hex_key,
-        &version,
-        nickname,
-        Some(matched.base_wxid.clone()),
-    );
-    store.save_default()?;
-    eprintln!("Key saved to {:?}", wx_keychain::KeyStore::default_path()?);
-
-    Ok(())
-}
-
-#[cfg(windows)]
 pub async fn cmd_key_extract(_timeout_secs: u64) -> Result<(), Box<dyn std::error::Error>> {
     let version = wx_keychain::installed_weixin_version()?;
     let accounts = wx_keychain::find_account_dirs()?;
@@ -90,47 +17,6 @@ pub async fn cmd_key_extract(_timeout_secs: u64) -> Result<(), Box<dyn std::erro
     persist_scan_results(results, &version)
 }
 
-#[cfg(not(any(target_os = "macos", windows)))]
-pub async fn cmd_key_extract(_timeout_secs: u64) -> Result<(), Box<dyn std::error::Error>> {
-    Err("key extraction is unsupported on this platform".into())
-}
-
-#[cfg(target_os = "macos")]
-pub fn cmd_key_scan() -> Result<(), Box<dyn std::error::Error>> {
-    // SIP check — task_for_pid fails with kern_return=5 when SIP is enabled,
-    // even as root. This is a hard requirement (tested 2026-03-08).
-    let sip = wx_keychain::check_sip();
-    if !sip.passed {
-        return Err(format!(
-            "{} — task_for_pid requires SIP disabled. Disable in Recovery Mode: csrutil disable",
-            sip.detail
-        )
-        .into());
-    }
-
-    // Find WeChat process (PID + version only).
-    let (pid, version) = wx_keychain::find_wechat_pid()?;
-    eprintln!("Found WeChat PID {} (v{})", pid, version);
-
-    // Load account directories.
-    let accounts = wx_keychain::find_account_dirs()?;
-    if accounts.is_empty() {
-        return Err("no WeChat account directories found".into());
-    }
-    eprintln!(
-        "Found {} account director{}",
-        accounts.len(),
-        if accounts.len() == 1 { "y" } else { "ies" }
-    );
-
-    // Scan process memory.
-    eprintln!("Scanning WeChat process memory...");
-    let results = wx_keychain::capture_key_mach(pid, &accounts, &wx_decrypt::MACOS_4_1_7_31)?;
-
-    persist_scan_results(results, &version)
-}
-
-#[cfg(windows)]
 pub fn cmd_key_scan() -> Result<(), Box<dyn std::error::Error>> {
     wx_keychain::preflight_checks()?;
     let (_, version) = wx_keychain::find_wechat_pid()?;
@@ -156,7 +42,7 @@ pub fn cmd_key_scan() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn persist_scan_results(
-    results: Vec<wx_keychain::mach_vm::MemoryCaptureResult>,
+    results: Vec<wx_keychain::memory_scan::MemoryCaptureResult>,
     version: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Count total pairs across all results
@@ -238,11 +124,6 @@ fn persist_scan_results(
     eprintln!("Keys saved to {:?}", wx_keychain::KeyStore::default_path()?);
 
     Ok(())
-}
-
-#[cfg(not(any(target_os = "macos", windows)))]
-pub fn cmd_key_scan() -> Result<(), Box<dyn std::error::Error>> {
-    Err("key scan is unsupported on this platform".into())
 }
 
 pub fn cmd_key_list() -> Result<(), Box<dyn std::error::Error>> {

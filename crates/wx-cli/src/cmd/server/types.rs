@@ -23,7 +23,7 @@ pub struct ServerRunArgs {
     #[arg(long, conflicts_with = "fsnotify")]
     pub poll: bool,
 
-    /// Force fsnotify backend (opt-in on macOS, where polling is the default)
+    /// Force the Windows filesystem notification backend
     #[arg(long, conflicts_with = "poll")]
     pub fsnotify: bool,
 
@@ -91,7 +91,7 @@ pub struct ServerWorkerArgs {
     #[arg(long, conflicts_with = "fsnotify")]
     pub poll: bool,
 
-    /// Force fsnotify backend (opt-in on macOS, where polling is the default)
+    /// Force the Windows filesystem notification backend
     #[arg(long, conflicts_with = "poll")]
     pub fsnotify: bool,
 

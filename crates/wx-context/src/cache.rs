@@ -108,6 +108,8 @@ impl PersistentCache {
         use crate::progress::AtomicStats;
         use rayon::prelude::*;
 
+        self.ensure_cache_writable()?;
+
         // Phase 1: Discover
         let all_db_files = crate::db_category::discover_db_files(&self.encrypted_root)?;
         if all_db_files.is_empty() {
@@ -204,6 +206,39 @@ impl PersistentCache {
         }
 
         Ok(stats)
+    }
+
+    /// Fail early with an actionable error when an Agent sandbox or Windows ACL
+    /// permits reading WeChat data but blocks updates to the decrypt cache.
+    fn ensure_cache_writable(&self) -> Result<(), ContextError> {
+        std::fs::create_dir_all(&self.cache_root).map_err(|error| {
+            ContextError::Cache(format!(
+                "cache directory is not writable ({}): {error}; allow wx-cli to write its local cache, or retry from a normal PowerShell session",
+                self.cache_root.display()
+            ))
+        })?;
+
+        let probe = self.cache_root.join(format!(
+            ".write-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::write(&probe, []).map_err(|error| {
+            ContextError::Cache(format!(
+                "cache directory is not writable ({}): {error}; if wx-cli is running in an Agent sandbox, allow this query command to access the local cache; otherwise retry from a normal PowerShell session",
+                self.cache_root.display()
+            ))
+        })?;
+        std::fs::remove_file(&probe).map_err(|error| {
+            ContextError::Cache(format!(
+                "cache write probe could not be removed ({}): {error}",
+                probe.display()
+            ))
+        })?;
+        Ok(())
     }
 
     /// Per-DB decrypt logic. Acquires per-file lock, performs authoritative needs_decrypt

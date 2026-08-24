@@ -1412,12 +1412,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mach2"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dae608c151f68243f2b000364e1f7b186d9c29845f7d2d85bd31b9ad77ad552b"
-
-[[package]]
 name = "matchers"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3133,7 +3127,7 @@ checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 
 [[package]]
 name = "wx-cli"
-version = "0.7.4-windows.1"
+version = "0.7.5"
 dependencies = [
  "axum",
  "chrono",
@@ -3146,7 +3140,6 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
- "silk-rs",
  "tempfile",
  "tokio",
  "tokio-stream",
@@ -3170,7 +3163,7 @@ dependencies = [
 
 [[package]]
 name = "wx-context"
-version = "0.7.4-windows.1"
+version = "0.7.5"
 dependencies = [
  "aes",
  "cbc",
@@ -3194,7 +3187,7 @@ dependencies = [
 
 [[package]]
 name = "wx-db"
-version = "0.7.4-windows.1"
+version = "0.7.5"
 dependencies = [
  "hex",
  "insta",
@@ -3211,7 +3204,7 @@ dependencies = [
 
 [[package]]
 name = "wx-decrypt"
-version = "0.7.4-windows.1"
+version = "0.7.5"
 dependencies = [
  "aes",
  "cbc",
@@ -3224,15 +3217,13 @@ dependencies = [
 
 [[package]]
 name = "wx-keychain"
-version = "0.7.4-windows.1"
+version = "0.7.5"
 dependencies = [
  "aes",
  "cbc",
  "chrono",
  "hex",
  "hmac",
- "libc",
- "mach2",
  "regex",
  "rusqlite",
  "serde",
@@ -3248,7 +3239,7 @@ dependencies = [
 
 [[package]]
 name = "wx-media"
-version = "0.7.4-windows.1"
+version = "0.7.5"
 dependencies = [
  "aes",
  "base64",
@@ -3266,7 +3257,7 @@ dependencies = [
 
 [[package]]
 name = "wx-monitor"
-version = "0.7.4-windows.1"
+version = "0.7.5"
 dependencies = [
  "aes",
  "cbc",
@@ -3287,7 +3278,7 @@ dependencies = [
 
 [[package]]
 name = "wx-paths"
-version = "0.7.4-windows.1"
+version = "0.7.5"
 dependencies = [
  "dirs",
  "libc",

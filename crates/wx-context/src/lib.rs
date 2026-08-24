@@ -1,9 +1,5 @@
 //! WeChat database context layer — account resolution, decrypt orchestration,
-//! and encrypted direct-open support.
-//!
-//! When `raw_key` is available, use [`open_encrypted_db`] or
-//! [`open_encrypted_db_with_pool`] to open encrypted databases directly
-//! via SQLCipher's `sqlite3_key()` C API, bypassing the decrypt-cache pipeline.
+//! and the Windows decrypt-cache pipeline.
 
 mod account;
 mod cache;
@@ -38,7 +34,7 @@ pub use visibility::VisibilityIndex;
 
 /// Whether this build can open encrypted databases directly through SQLCipher.
 pub const fn direct_encrypted_open_available() -> bool {
-    cfg!(target_os = "macos")
+    false
 }
 
 /// Read persisted per-database derived keys for this account.

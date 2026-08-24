@@ -4,8 +4,8 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use crate::error::KeychainError;
-use crate::mach_vm::pattern::{scan_bare_hex_keys, scan_chunk, FoundKey, MAX_PATTERN_BYTES};
-use crate::mach_vm::reader::MemoryReader;
+use crate::memory_scan::pattern::{scan_bare_hex_keys, scan_chunk, FoundKey, MAX_PATTERN_BYTES};
+use crate::memory_scan::reader::MemoryReader;
 
 /// The maximum supported pattern is `x'<192 hex>'` = 195 bytes.
 /// Keep `MAX_PATTERN_BYTES - 1` bytes so chunk-boundary matches are not missed.
@@ -95,7 +95,7 @@ impl<R: MemoryReader> MemoryScanner<R> {
     #[cfg(windows)]
     fn scan_binary_keys_near_salts(
         &self,
-        regions: &[crate::mach_vm::MemRegion],
+        regions: &[crate::memory_scan::MemRegion],
         raw_key_candidates: &[[u8; 32]],
         db_salts: &[([u8; 16], &Path)],
         params: &wx_decrypt::CryptoParams,
@@ -452,7 +452,7 @@ impl<R: MemoryReader> MemoryScanner<R> {
     #[allow(clippy::too_many_arguments)]
     fn scan_weixin_4_1_codec_contexts(
         &self,
-        regions: &[crate::mach_vm::MemRegion],
+        regions: &[crate::memory_scan::MemRegion],
         targets: &[BinaryTarget<'_>],
         params: &wx_decrypt::CryptoParams,
         results: &mut Vec<ScanResult>,
@@ -685,7 +685,7 @@ impl<R: MemoryReader> MemoryScanner<R> {
     #[allow(clippy::too_many_arguments)]
     fn scan_masked_cipher_contexts(
         &self,
-        regions: &[crate::mach_vm::MemRegion],
+        regions: &[crate::memory_scan::MemRegion],
         targets: &[BinaryTarget<'_>],
         params: &wx_decrypt::CryptoParams,
         results: &mut Vec<ScanResult>,
@@ -852,7 +852,7 @@ impl<R: MemoryReader> MemoryScanner<R> {
     #[cfg(windows)]
     fn scan_openssl_aes_schedules(
         &self,
-        regions: &[crate::mach_vm::MemRegion],
+        regions: &[crate::memory_scan::MemRegion],
         targets: &[BinaryTarget<'_>],
         params: &wx_decrypt::CryptoParams,
         results: &mut Vec<ScanResult>,
@@ -932,7 +932,7 @@ impl<R: MemoryReader> MemoryScanner<R> {
     #[cfg(windows)]
     fn scan_aligned_binary_keys(
         &self,
-        regions: &[crate::mach_vm::MemRegion],
+        regions: &[crate::memory_scan::MemRegion],
         target: &BinaryTarget<'_>,
         params: &wx_decrypt::CryptoParams,
         alignment_offset: usize,
@@ -1092,7 +1092,7 @@ impl<R: MemoryReader> MemoryScanner<R> {
     /// Scan all regions, returning deduplicated candidates.
     fn scan_regions(
         &self,
-        regions: &[crate::mach_vm::MemRegion],
+        regions: &[crate::memory_scan::MemRegion],
     ) -> Result<(Vec<FoundKey>, Vec<[u8; 32]>), KeychainError> {
         let mut seen = HashSet::new();
         let mut all_keys = Vec::new();
@@ -1527,7 +1527,7 @@ fn validate_key_for_db(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mach_vm::reader::MemRegion;
+    use crate::memory_scan::reader::MemRegion;
     use wx_decrypt::MACOS_4_1_7_31;
 
     struct MockReader {
