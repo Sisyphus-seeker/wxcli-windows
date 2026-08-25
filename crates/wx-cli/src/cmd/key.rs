@@ -1,5 +1,5 @@
 use crate::util::{lookup_or_resolve_nickname, parse_hex_key_32};
-pub async fn cmd_key_extract(_timeout_secs: u64) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn cmd_key_extract(timeout_secs: u64) -> Result<(), Box<dyn std::error::Error>> {
     let version = wx_keychain::installed_weixin_version()?;
     let accounts = wx_keychain::find_account_dirs()?;
     if accounts.is_empty() {
@@ -7,13 +7,38 @@ pub async fn cmd_key_extract(_timeout_secs: u64) -> Result<(), Box<dyn std::erro
     }
 
     let params = wx_decrypt::platform_default_params();
-    let pids = wx_keychain::find_weixin_pids()?;
+    let pids = match wx_keychain::find_weixin_pids() {
+        Ok(pids) => pids,
+        Err(wx_keychain::KeychainError::WeChatNotRunning) => {
+            eprintln!("Weixin is not running; launching it with startup key capture...");
+            let results = wx_keychain::launch_and_capture_keys_windows_debug(
+                &accounts,
+                params,
+                std::time::Duration::from_secs(timeout_secs),
+            )?;
+            return persist_scan_results(results, &version);
+        }
+        Err(error) => return Err(error.into()),
+    };
     eprintln!(
         "Scanning {} Weixin process{} for pre-derived database keys...",
         pids.len(),
         if pids.len() == 1 { "" } else { "es" }
     );
-    let results = wx_keychain::capture_keys_windows(&pids, &accounts, params)?;
+    let results = match wx_keychain::capture_keys_windows(&pids, &accounts, params) {
+        Ok(results) => results,
+        Err(static_error) => {
+            eprintln!(
+                "Passive memory scan found no validated keys ({static_error}); waiting for database KDF activity..."
+            );
+            wx_keychain::capture_keys_windows_debug(
+                &pids,
+                &accounts,
+                params,
+                std::time::Duration::from_secs(timeout_secs),
+            )?
+        }
+    };
     persist_scan_results(results, &version)
 }
 

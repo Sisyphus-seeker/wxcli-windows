@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-08-25
+
+### Weixin 4.1.12.26 compatibility
+
+- Add startup-time SQLCipher passphrase capture for Windows x64 Weixin 4.1.12.26
+- Parse the embedded database salt before the codec salt buffer is initialized,
+  and persist only keys validated against local database pages
+- Launch Weixin automatically from `key extract` when it is not running, so the
+  first database initialization can be captured
+- Report the running process separately from key-extraction compatibility in
+  `status` and `doctor`
+
 ## [0.7.5] - 2026-08-24
 
 ### Windows-only release

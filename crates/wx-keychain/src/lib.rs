@@ -17,8 +17,8 @@ pub use process::config_dir;
 pub use process::detect_active_account;
 pub use process::{
     ensure_supported_wechat_version, extract_base_wxid, find_account_dirs, find_account_dirs_under,
-    find_wechat_pid, is_xwechat_files_root, AccountDirInfo, ActiveAccount, DetectionSource,
-    SUPPORTED_VERSION,
+    find_wechat_pid, is_extraction_compatible, is_xwechat_files_root, AccountDirInfo,
+    ActiveAccount, DetectionSource, SUPPORTED_VERSION,
 };
 pub use store::{AccountKey, EncKeyEntry, KeyStore};
 #[cfg(windows)]

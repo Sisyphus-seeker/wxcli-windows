@@ -1,12 +1,25 @@
 pub fn cmd_status() -> Result<(), Box<dyn std::error::Error>> {
-    // WeChat process status (pgrep-only, no lsof)
-    match wx_keychain::find_wechat_pid() {
-        Ok((pid, version)) => {
-            println!("WeChat:   running (pid {pid}, v{version})");
+    // Report process state independently from key-extraction compatibility.
+    match wx_keychain::find_weixin_pids() {
+        Ok(pids) => {
+            let version = wx_keychain::installed_weixin_version()
+                .map(|version| {
+                    let support = if wx_keychain::is_extraction_compatible(&version) {
+                        "key extraction supported"
+                    } else {
+                        "key extraction unsupported"
+                    };
+                    format!(", v{version}, {support}")
+                })
+                .unwrap_or_default();
+            println!(
+                "WeChat:   running ({} process{}{})",
+                pids.len(),
+                if pids.len() == 1 { "" } else { "es" },
+                version
+            );
         }
-        Err(_) => {
-            println!("WeChat:   not running");
-        }
+        Err(err) => println!("WeChat:   not running ({err})"),
     }
 
     // Account directories

@@ -40,8 +40,10 @@ use crate::windows::{installed_weixin_version, WindowsMemoryReader};
 use wx_decrypt::{CryptoParams, EncKeyPair, KeyMaterial};
 
 const SUPPORTED_DEBUG_VERSION: &str = "4.1.11.24";
+const PASSPHRASE_DEBUG_VERSION: &str = "4.1.12.26";
 const WEIXIN_DLL_NAME: &str = "Weixin.dll";
 const KEY_UNMASKED_BREAKPOINT_RVA: u64 = 0x0336_A1E7;
+const PASSPHRASE_BREAKPOINT_RVA: u64 = 0x0348_5AE0;
 const TRAP_FLAG: u32 = 0x100;
 const KEY_MASK: [u8; 32] = [
     0x55, 0xE8, 0x9C, 0x9F, 0xCC, 0x23, 0xE3, 0x38, 0x2F, 0x46, 0x54, 0xD4, 0xF9, 0xD7, 0x23, 0x7E,
@@ -74,6 +76,12 @@ struct BreakpointState {
     installed: bool,
 }
 
+#[derive(Clone, Copy)]
+enum CaptureKind {
+    WeixinKeyBuffer,
+    WeixinPassphrase,
+}
+
 pub fn capture_keys_windows_debug(
     pids: &[u32],
     accounts: &[AccountDirInfo],
@@ -81,11 +89,15 @@ pub fn capture_keys_windows_debug(
     timeout: Duration,
 ) -> Result<Vec<MemoryCaptureResult>, KeychainError> {
     let version = installed_weixin_version()?;
-    if version != SUPPORTED_DEBUG_VERSION {
+    let capture_kind = if version == SUPPORTED_DEBUG_VERSION {
+        CaptureKind::WeixinKeyBuffer
+    } else if version == PASSPHRASE_DEBUG_VERSION {
+        CaptureKind::WeixinPassphrase
+    } else {
         return Err(KeychainError::Other(format!(
-            "dynamic capture supports Weixin {SUPPORTED_DEBUG_VERSION}, found {version}"
+            "dynamic capture supports Weixin {SUPPORTED_DEBUG_VERSION} and {PASSPHRASE_DEBUG_VERSION}, found {version}"
         )));
-    }
+    };
 
     let targets = collect_targets(accounts, params);
     if targets.is_empty() {
@@ -126,7 +138,13 @@ pub fn capture_keys_windows_debug(
         }
 
         eprintln!("Waiting for Weixin database activity (pid {pid})...");
-        match capture_process(pid, &targets, params, per_process.min(remaining)) {
+        match capture_process(
+            pid,
+            &targets,
+            params,
+            per_process.min(remaining),
+            capture_kind,
+        ) {
             Ok(mut keys) => captured.append(&mut keys),
             Err(error) => {
                 eprintln!("  pid {pid} capture skipped: {error}");
@@ -154,11 +172,15 @@ pub fn launch_and_capture_keys_windows_debug(
     timeout: Duration,
 ) -> Result<Vec<MemoryCaptureResult>, KeychainError> {
     let version = installed_weixin_version()?;
-    if version != SUPPORTED_DEBUG_VERSION {
+    let capture_kind = if version == SUPPORTED_DEBUG_VERSION {
+        CaptureKind::WeixinKeyBuffer
+    } else if version == PASSPHRASE_DEBUG_VERSION {
+        CaptureKind::WeixinPassphrase
+    } else {
         return Err(KeychainError::Other(format!(
-            "dynamic launch supports Weixin {SUPPORTED_DEBUG_VERSION}, found {version}"
+            "dynamic launch supports Weixin {SUPPORTED_DEBUG_VERSION} and {PASSPHRASE_DEBUG_VERSION}, found {version}"
         )));
-    }
+    };
 
     let targets = collect_targets(accounts, params);
     if targets.is_empty() {
@@ -166,7 +188,8 @@ pub fn launch_and_capture_keys_windows_debug(
     }
     let executable = find_weixin_executable()?;
     eprintln!("Launching Weixin with startup key capture...");
-    let captured = unsafe { capture_launched_process(&executable, &targets, params, timeout)? };
+    let captured =
+        unsafe { capture_launched_process(&executable, &targets, params, timeout, capture_kind)? };
     aggregate_results(captured, &targets, accounts)
 }
 
@@ -175,6 +198,7 @@ unsafe fn capture_launched_process(
     targets: &[DbTarget],
     params: &CryptoParams,
     timeout: Duration,
+    capture_kind: CaptureKind,
 ) -> Result<Vec<(usize, [u8; 32])>, KeychainError> {
     let executable_wide = wide_null(executable.as_os_str());
     let working_directory_wide = executable
@@ -245,7 +269,11 @@ unsafe fn capture_launched_process(
                     });
                 if is_weixin_dll {
                     if let Some(state) = processes.get_mut(&event.dwProcessId) {
-                        let address = info.lpBaseOfDll as u64 + KEY_UNMASKED_BREAKPOINT_RVA;
+                        let breakpoint_rva = match capture_kind {
+                            CaptureKind::WeixinKeyBuffer => KEY_UNMASKED_BREAKPOINT_RVA,
+                            CaptureKind::WeixinPassphrase => PASSPHRASE_BREAKPOINT_RVA,
+                        };
+                        let address = info.lpBaseOfDll as u64 + breakpoint_rva;
                         if let Ok(original) = read_exact(state.handle, address, 1) {
                             if write_byte(state.handle, address, 0xCC).is_ok() {
                                 state.breakpoint = Some(BreakpointState {
@@ -272,14 +300,24 @@ unsafe fn capture_launched_process(
                             (state.breakpoint.as_mut(), thread_context(event.dwThreadId))
                         {
                             stats.breakpoint_hits += 1;
-                            capture_context(
-                                state.handle,
-                                &context,
-                                targets,
-                                params,
-                                &mut captured,
-                                &mut stats,
-                            );
+                            match capture_kind {
+                                CaptureKind::WeixinKeyBuffer => capture_context(
+                                    state.handle,
+                                    &context,
+                                    targets,
+                                    params,
+                                    &mut captured,
+                                    &mut stats,
+                                ),
+                                CaptureKind::WeixinPassphrase => capture_passphrase_context(
+                                    state.handle,
+                                    &context,
+                                    targets,
+                                    params,
+                                    &mut captured,
+                                    &mut stats,
+                                ),
+                            }
                             let _ =
                                 write_byte(state.handle, breakpoint.address, breakpoint.original);
                             breakpoint.installed = false;
@@ -421,9 +459,16 @@ fn capture_process(
     targets: &[DbTarget],
     params: &CryptoParams,
     timeout: Duration,
+    capture_kind: CaptureKind,
 ) -> Result<Vec<(usize, [u8; 32])>, KeychainError> {
-    let module_base = find_module_base(pid, WEIXIN_DLL_NAME)?;
-    let breakpoint_address = module_base + KEY_UNMASKED_BREAKPOINT_RVA;
+    let breakpoint_address = match capture_kind {
+        CaptureKind::WeixinKeyBuffer => {
+            find_module_base(pid, WEIXIN_DLL_NAME)? + KEY_UNMASKED_BREAKPOINT_RVA
+        }
+        CaptureKind::WeixinPassphrase => {
+            find_module_base(pid, WEIXIN_DLL_NAME)? + PASSPHRASE_BREAKPOINT_RVA
+        }
+    };
     let process = unsafe {
         OpenProcess(
             PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION,
@@ -436,7 +481,15 @@ fn capture_process(
     }
 
     let result = unsafe {
-        capture_attached_process(process, pid, breakpoint_address, targets, params, timeout)
+        capture_attached_process(
+            process,
+            pid,
+            breakpoint_address,
+            targets,
+            params,
+            timeout,
+            capture_kind,
+        )
     };
     unsafe { CloseHandle(process) };
     result
@@ -449,6 +502,7 @@ unsafe fn capture_attached_process(
     targets: &[DbTarget],
     params: &CryptoParams,
     timeout: Duration,
+    capture_kind: CaptureKind,
 ) -> Result<Vec<(usize, [u8; 32])>, KeychainError> {
     if unsafe { DebugActiveProcess(pid) } == 0 {
         return Err(last_error(format!("DebugActiveProcess({pid})")));
@@ -500,14 +554,24 @@ unsafe fn capture_attached_process(
             if code == EXCEPTION_BREAKPOINT && address == breakpoint_address {
                 if let Ok(mut context) = thread_context(event.dwThreadId) {
                     stats.breakpoint_hits += 1;
-                    capture_context(
-                        process,
-                        &context,
-                        targets,
-                        params,
-                        &mut captured,
-                        &mut stats,
-                    );
+                    match capture_kind {
+                        CaptureKind::WeixinKeyBuffer => capture_context(
+                            process,
+                            &context,
+                            targets,
+                            params,
+                            &mut captured,
+                            &mut stats,
+                        ),
+                        CaptureKind::WeixinPassphrase => capture_passphrase_context(
+                            process,
+                            &context,
+                            targets,
+                            params,
+                            &mut captured,
+                            &mut stats,
+                        ),
+                    }
                     let _ = write_byte(process, breakpoint_address, original);
                     breakpoint_installed = false;
                     context.Rip = breakpoint_address;
@@ -645,6 +709,93 @@ fn capture_context(
         let key: [u8; 32] = key_bytes[..32].try_into().expect("key buffer");
         let unmasked = std::array::from_fn(|index| key[index] ^ KEY_MASK[index]);
         for candidate in [key, unmasked] {
+            if validate_candidate(target, &candidate, params) {
+                captured.push((target_index, candidate));
+                return;
+            }
+        }
+    }
+}
+
+fn capture_passphrase_context(
+    process: HANDLE,
+    context: &CONTEXT,
+    targets: &[DbTarget],
+    params: &CryptoParams,
+    captured: &mut Vec<(usize, [u8; 32])>,
+    stats: &mut CaptureStats,
+) {
+    let passphrase_length = context.R8 as usize;
+    if !(32..=256).contains(&passphrase_length) {
+        return;
+    }
+    let Ok(passphrase) = read_exact(process, context.Rdx, passphrase_length) else {
+        return;
+    };
+    stats.readable_keys += 1;
+
+    // Weixin 4.1.12 passes SQLCipher's x'<key><salt>' literal here. At this
+    // point the codec's salt buffer has been allocated but is not populated
+    // yet, so prefer the salt embedded in the passphrase itself.
+    let found_patterns = memory_scan::scan_chunk(&passphrase);
+    stats.parsed_patterns += found_patterns.len();
+    for found in &found_patterns {
+        let candidate_targets = targets.iter().enumerate().filter(|(_, target)| {
+            found
+                .salt
+                .is_none_or(|embedded_salt| embedded_salt == target.salt)
+        });
+        for (target_index, target) in candidate_targets {
+            let derived = wx_decrypt::kdf::derive_enc_key(&found.enc_key, &target.salt, params);
+            for candidate in [found.enc_key, derived] {
+                if validate_candidate(target, &candidate, params) {
+                    captured.push((target_index, candidate));
+                    return;
+                }
+            }
+        }
+    }
+
+    let Ok(salt_pointer_bytes) = read_exact(process, context.Rcx + 0x48, 8) else {
+        return;
+    };
+    let salt_pointer = u64::from_le_bytes(salt_pointer_bytes.try_into().expect("salt pointer"));
+    let Ok(salt_bytes) = read_exact(process, salt_pointer, 16) else {
+        return;
+    };
+    let Ok(salt) = <[u8; 16]>::try_from(salt_bytes) else {
+        return;
+    };
+    stats.readable_salts += 1;
+    let Some((target_index, target)) = targets
+        .iter()
+        .enumerate()
+        .find(|(_, target)| target.salt == salt)
+    else {
+        return;
+    };
+    stats.matched_salts += 1;
+
+    let mut raw_candidates = Vec::new();
+    if let Ok(raw) = <[u8; 32]>::try_from(passphrase.as_slice()) {
+        raw_candidates.push(raw);
+    }
+    if passphrase.len() == 64 && passphrase.iter().all(u8::is_ascii_hexdigit) {
+        if let Ok(decoded) = hex::decode(&passphrase) {
+            if let Ok(raw) = <[u8; 32]>::try_from(decoded) {
+                raw_candidates.push(raw);
+            }
+        }
+    }
+    for found in found_patterns {
+        raw_candidates.push(found.enc_key);
+    }
+    raw_candidates.sort_unstable();
+    raw_candidates.dedup();
+
+    for raw_key in raw_candidates {
+        let enc_key = wx_decrypt::kdf::derive_enc_key(&raw_key, &salt, params);
+        for candidate in [raw_key, enc_key] {
             if validate_candidate(target, &candidate, params) {
                 captured.push((target_index, candidate));
                 return;

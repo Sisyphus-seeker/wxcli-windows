@@ -142,8 +142,21 @@ pub fn preflight_checks() -> Vec<PreflightCheck> {
     let version = installed_weixin_version();
     let version_check = PreflightCheck {
         name: "Weixin version",
-        passed: version.is_ok(),
-        detail: version.unwrap_or_else(|err| err.to_string()),
+        passed: version
+            .as_deref()
+            .is_ok_and(crate::process::is_extraction_compatible),
+        detail: version
+            .map(|version| {
+                if crate::process::is_extraction_compatible(&version) {
+                    format!("{version} (key extraction supported)")
+                } else {
+                    format!(
+                        "{version} is not supported for key extraction (latest verified: {})",
+                        crate::process::SUPPORTED_VERSION
+                    )
+                }
+            })
+            .unwrap_or_else(|err| err.to_string()),
         fix_cmd: None,
     };
     let data_root = wx_paths::AppPaths::new()
