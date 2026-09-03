@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Documentation
+
+- Use Windows and PowerShell paths consistently in the README and Agent Skill
+- Clarify that the Agent Skill installs directly from GitHub and that full-text search does not yet apply contact-hiding rules
+- Correct the SemVer prerelease example and ignore common local export directories
+
 ## [0.7.6] - 2026-08-25
 
 ### Weixin 4.1.12.26 compatibility

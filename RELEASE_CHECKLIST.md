@@ -32,8 +32,8 @@ cargo build --release -p wx-cli
 ## Publishing
 
 - Publish from GitHub Actions instead of uploading a local `target` binary.
-- Use a prerelease tag for the first Windows build, such as
-  `v0.7.5`.
+- Use a SemVer prerelease tag for compatibility testing, such as
+  `v0.7.7-rc.1`, then publish `v0.7.7` after verification.
 - Publish the generated SHA256 files with the release archives.
 - State that unsigned binaries may trigger Microsoft Defender or SmartScreen
   because the tool reads WeChat process memory.

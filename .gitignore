@@ -11,3 +11,8 @@ __pycache__/
 keys.toml
 settings.toml
 .DS_Store
+
+# Local WeChat data and user-generated exports
+xwechat_files/
+export/
+exports/

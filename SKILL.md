@@ -87,7 +87,7 @@ Windows 会按真实数据库盐值保存已验证的密钥材料。后续查询
 
 提取后验证：
 
-```bash
+```powershell
 # 查看已保存密钥材料
 wx-cli key list
 
@@ -100,7 +100,7 @@ wx-cli decrypt --incremental
 
 手动设置密钥：
 
-```bash
+```powershell
 wx-cli key set <account_id> 0123456789abcdef...       # 数据库密钥（32 字节 hex）
 wx-cli key set-image <account_id> abcdefghijklmnop     # 图片 AES 密钥（V2 格式）
 ```
@@ -114,14 +114,14 @@ wx-cli key set-image <account_id> abcdefghijklmnop     # 图片 AES 密钥（V2 
 
 ### 1. 查看最近聊天
 
-```bash
+```powershell
 wx-cli sessions --limit 10
 # 返回按时间倒序的会话列表，含联系人显示名和最后一条消息摘要
 ```
 
 ### 2. 查找某人并读消息
 
-```bash
+```powershell
 # 先搜联系人（支持昵称、备注、wxid、微信号、手机号等模糊匹配）
 wx-cli contacts --search 张三
 
@@ -148,7 +148,7 @@ ignore_tags = ["同事"]
 
 ### 3. 全局搜索关键词
 
-```bash
+```powershell
 wx-cli search 周末 --limit 20
 # 优先查询 WeChat 自带的全文索引库，搜索通常在亚秒级完成
 ```
@@ -160,14 +160,14 @@ wx-cli search 周末 --limit 20
 
 ### 4. 按条件过滤消息
 
-```bash
+```powershell
 wx-cli query 张三 --type text           # 按类型：text/image/voice/video/emoji/app/system/revoke
 wx-cli query 张三 --since 1772600000 --until 1772700000   # 时间范围（Unix 秒）
 ```
 
 ### 4b. 锚点上下文查询
 
-```bash
+```powershell
 wx-cli query 张三 --around-sort-seq 1773421188000 --context 10    # 按 sort_seq 定位前后 10 条
 wx-cli query 张三 --around-server-id 5455993825313690274 --context 10  # 按 server_id 定位
 wx-cli query 张三 --after-sort-seq 1773421188000 --limit 20       # 增量拉取新消息
@@ -181,30 +181,30 @@ wx-cli query 张三 --after-sort-seq 1773421188000 --limit 20       # 增量拉�
 
 ### 5. 群聊查询
 
-```bash
+```powershell
 wx-cli query 18819405230@chatroom --limit 10   # 群聊 ID
 wx-cli query 周末爬山群                          # 或群名模糊匹配
 ```
 
 ### 6. 导出会话
 
-```bash
-wx-cli export 张三 -o ./export/ --all                        # TXT 格式，全部消息
-wx-cli export 张三 -o ./export/ --all --format json           # JSON 格式
-wx-cli export 张三 -o ./export/ --all --no-media              # 跳过媒体文件
-wx-cli export 张三 -o ./export/ --all --show-emoji            # 显示表情细节
+```powershell
+wx-cli export 张三 -o .\export --all                        # TXT 格式，全部消息
+wx-cli export 张三 -o .\export --all --format json           # JSON 格式
+wx-cli export 张三 -o .\export --all --no-media              # 跳过媒体文件
+wx-cli export 张三 -o .\export --all --show-emoji            # 显示表情细节
 ```
 
 **排序默认 `asc`**（时间正序），与 `query` 默认 `desc` 相反。
 
 ### 7. 图片解密与转码
 
-```bash
+```powershell
 # 推荐：-d 自动推导 V2 密钥
 wx-cli decode-image input.dat -d <account_data_dir> -o output.png
 
 # 批量目录
-wx-cli decode-image <dat_dir> -d <account_data_dir> -o ./output/
+wx-cli decode-image <dat_dir> -d <account_data_dir> -o .\output
 
 # 直接传入 V2 AES key
 wx-cli media decrypt-dat input.dat --v2-key abcdefghijklmnop -o output.png
@@ -212,32 +212,34 @@ wx-cli media decrypt-dat input.dat --v2-key abcdefghijklmnop -o output.png
 
 ### 8. 语音提取
 
-```bash
+```powershell
 wx-cli media extract-voice --media-dir <dir> <svr_id> -o voice.mp3    # 默认 MP3（需 ffmpeg）
 wx-cli media extract-voice --media-dir <dir> <svr_id> --raw -o voice.silk  # 原始 SILK
 ```
 
 ### 8b. Hardlink 路径查询
 
-```bash
-wx-cli media resolve-path --db /path/to/hardlink.db <md5_key>                    # 图片
-wx-cli media resolve-path --db /path/to/hardlink.db --media-type video <key>     # 视频
-wx-cli media resolve-path --db /path/to/hardlink.db --media-type file <key>      # 文件
+```powershell
+wx-cli media resolve-path --db <hardlink.db路径> <md5_key>                    # 图片
+wx-cli media resolve-path --db <hardlink.db路径> --media-type video <key>     # 视频
+wx-cli media resolve-path --db <hardlink.db路径> --media-type file <key>      # 文件
 ```
 
 ### 9. 视频号视频解密
 
-```bash
+```powershell
 wx-cli media decrypt-video encrypted.bin --seed 2105122989 -o video.mp4      # 十进制 seed
 wx-cli media decrypt-video encrypted.bin --seed 0x7d844e8d -o video.mp4      # 十六进制 seed
 ```
 
 ### 10. HTTP API 服务
 
-```bash
+```powershell
 wx-cli server run                                          # 本地启动（默认 127.0.0.1:9100）
 wx-cli server run --host 0.0.0.0 --token mysecret          # 远程访问（必须设 token）
-wx-cli server status / stop / restart                      # 管理服务
+wx-cli server status                                       # 查看状态
+wx-cli server stop                                         # 停止服务
+wx-cli server restart                                      # 重启服务
 ```
 
 ### 10a. CLI 自动复用已运行的 server
@@ -272,7 +274,7 @@ wx-cli server status / stop / restart                      # 管理服务
 
 ### 11. 实时监听
 
-```bash
+```powershell
 wx-cli watch                          # 默认启动
 wx-cli watch --poll --poll-ms 5000    # 自定义轮询间隔
 wx-cli watch --format json            # JSON 格式（每行一个 JSON 对象）
@@ -281,7 +283,7 @@ wx-cli watch --show-hidden            # 忽略隐藏配置
 
 ### 12. 前置条件检查
 
-```bash
+```powershell
 wx-cli doctor           # 按当前平台检查微信、版本、路径、权限和密钥提取条件
 wx-cli doctor --fix      # 对 FAIL 项输出修复命令
 ```
@@ -290,7 +292,7 @@ wx-cli doctor --fix      # 对 FAIL 项输出修复命令
 
 **`error: no key for account <account_id>`**
 
-```bash
+```powershell
 wx-cli status                           # 1. 确认 WeChat 状态
 wx-cli key extract                      # 2. 扫描 Windows 微信进程
 wx-cli key list                         # 3. 验证密钥
@@ -334,14 +336,14 @@ wx-cli sessions                         # 4. 重试查询
 
 **JSON 编程使用：** JSON 走 stdout，诊断信息走 stderr。分离采集才能正确解析：
 
-```bash
-OUTPUT=$(wx-cli query 张三 --format json --limit 5)
-echo "$OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d['items']))"
+```powershell
+$output = wx-cli query 张三 --format json --limit 5 | ConvertFrom-Json
+$output.items.Count
 ```
 
 ## 分页与排序
 
-```bash
+```powershell
 wx-cli query 张三 --format json --limit 10 --offset 0    # 第一页
 wx-cli query 张三 --format json --limit 10 --offset 10   # 第二页
 wx-cli query 张三 --order asc                             # 时间正序
@@ -391,10 +393,10 @@ JSON `content` 字段为 tagged union：外层 key 是变体名，值是结构�
 
 当查询返回空结果时，**不要反复换参数重试**：
 
-```bash
+```powershell
 # 1. 检查 stats.skipped
-wx-cli query <contact> --all --format json 2>/dev/null | \
-  python3 -c "import json,sys; d=json.load(sys.stdin); print(f'items={len(d[\"items\"])}, skipped={d[\"stats\"][\"skipped\"]}')"
+$result = wx-cli query <contact> --all --format json | ConvertFrom-Json
+"items=$($result.items.Count), skipped=$($result.stats.skipped)"
 
 # 2. skipped > 0 → 重新解密
 wx-cli decrypt

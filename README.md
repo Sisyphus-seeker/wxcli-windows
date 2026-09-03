@@ -17,7 +17,7 @@ wx-cli 直接读取 Windows 上的微信本地数据，让你和 Agent 都能访
 - **导出与处理内容**：把会话导出为 JSON 或文本，并读取图片、语音、视频等媒体内容。
 - **让 Agent 直接使用**：项目自带 Agent Skill，Claude Code、Codex、Cursor 等工具安装后就知道怎样查询和订阅微信。
 - **提供稳定的本地服务**：REST API 可供个人助理、自动化任务、工作流和多个 Agent 共同使用。
-- **保护不想暴露的内容**：可隐藏指定联系人、群聊、标签或群成员，查询和订阅时自动过滤。
+- **保护不想暴露的内容**：可隐藏指定联系人、群聊、标签或群成员；查询、导出和订阅时自动过滤（全文搜索暂不应用隐藏规则）。
 
 ## 你可以基于它在微信上做什么
 
@@ -75,24 +75,26 @@ Windows 编译产物位于 `target/release/wx-cli.exe`。
 
 语音转码是可选功能，需 FFmpeg 和能够编译 `silk-rs` 的环境：
 
-```bash
+```powershell
 cargo build --release --features audio
 ```
 
 ### 部署二进制
 
 ```powershell
-$bin = "$HOME/.local/bin"
+$bin = "$env:LOCALAPPDATA\Programs\wx-cli"
 New-Item -ItemType Directory -Force $bin | Out-Null
 Copy-Item "target/release/wx-cli.exe" "$bin/wx-cli.exe"
 & "$bin/wx-cli.exe" --version
 ```
 
+如需直接运行 `wx-cli` 而不写完整路径，请在 Windows“环境变量”中把上述目录加入当前用户的 `PATH`。
+
 ### 让 Agent 直接使用
 
-本项目提供 [Agent Skill](https://skills.sh)。安装后，Claude Code、Codex、Cursor 等 Agent 可以直接理解 wx-cli 的能力，并帮你读取历史消息、搜索聊天和订阅新消息：
+本项目自带 Agent Skill，可通过 [skills CLI](https://skills.sh/docs/cli) 直接从 GitHub 安装。安装后，Claude Code、Codex、Cursor 等 Agent 可以理解 wx-cli 的能力，并帮你读取历史消息、搜索聊天和订阅新消息：
 
-```bash
+```powershell
 npx skills add Sisyphus-seeker/wxcli-windows
 ```
 
@@ -100,7 +102,7 @@ npx skills add Sisyphus-seeker/wxcli-windows
 
 ### 1. 检查环境
 
-```bash
+```powershell
 wx-cli doctor       # 检查当前平台的微信进程、版本、数据目录和权限
 wx-cli status       # 查看 WeChat 运行状态和所有账号密钥/缓存状态
 ```
@@ -108,7 +110,7 @@ wx-cli status       # 查看 WeChat 运行状态和所有账号密钥/缓存状�
 Windows 上 `doctor` 检查微信进程、安装版本、数据目录和进程内存读取权限。若数据不在自动探测位置，可设置：
 
 ```powershell
-$env:WX_CLI_WECHAT_DATA_DIR = "D:/xwechat_files"
+$env:WX_CLI_WECHAT_DATA_DIR = "D:\xwechat_files"
 wx-cli doctor
 ```
 
@@ -129,31 +131,31 @@ PowerShell 执行 `key extract`。wx-cli 会启动微信并捕获首次数据库
 
 手动设置密钥：
 
-```bash
+```powershell
 wx-cli key set <account> <64-hex-key>          # 数据库密钥
 wx-cli key set-image <account> <image-key>     # 图片密钥
 ```
 
 ### 3. 解密数据库
 
-```bash
+```powershell
 wx-cli decrypt                # 自动解密到缓存目录
 wx-cli decrypt --incremental  # 增量解密（只处理变化的文件）
 
 # 手动指定路径和密钥
-wx-cli decrypt -k <64位hex密钥> -d /path/to/xwechat_files/<account_dir> -o /tmp/decrypted
+wx-cli decrypt -k <64位hex密钥> -d <微信数据目录>\<账号目录> -o "$env:TEMP\wx-cli\decrypted"
 ```
 
 ### 4. 查询聊天记录
 
-```bash
+```powershell
 wx-cli sessions --limit 10             # 最近会话
 wx-cli contacts --search 张三           # 搜索联系人
 wx-cli query 张三 --limit 20            # 查某人的消息
 wx-cli search 周末 --limit 20           # 全局关键词搜索
 wx-cli query 张三 --type text           # 按消息类型过滤
 wx-cli query 周末爬山群                  # 群聊消息
-wx-cli export 张三 -o /tmp/export --all --format json  # 导出会话
+wx-cli export 张三 -o .\export --all --format json  # 导出会话
 wx-cli watch --poll --poll-ms 3000      # 实时监听新消息
 ```
 
@@ -161,16 +163,16 @@ wx-cli watch --poll --poll-ms 3000      # 实时监听新消息
 
 ### 5. 媒体解密
 
-```bash
+```powershell
 wx-cli decode-image input.dat -d <account_data_dir> -o output.png     # 解密图片
-wx-cli decode-image /path/to/dat_dir/ -d <account_data_dir> -o /tmp/  # 批量解密
+wx-cli decode-image .\dat_dir -d <微信数据目录> -o .\output  # 批量解密
 wx-cli media extract-voice --media-dir <dir> <svr_id> -o voice.mp3    # 提取语音（需 ffmpeg）
 wx-cli media decrypt-video encrypted.bin --seed 2105122989 -o video.mp4  # 解密视频号视频
 ```
 
 ### 6. HTTP API 服务
 
-```bash
+```powershell
 wx-cli server run                              # 启动（默认 127.0.0.1:9100）
 wx-cli server run --host 0.0.0.0 --token mysecret  # 远程访问（必须设 token）
 wx-cli server status                           # 查看状态
@@ -213,7 +215,7 @@ REST 端点：`/api/v1/health`、`/api/v1/sessions`、`/api/v1/contacts`、`/api
 | `wx-cli paths` | 查看所有数据路径 |
 | `wx-cli info <db>` | 查看数据库加密状态 |
 
-## Contact Hiding
+## 联系人隐藏
 
 按账号隐藏指定联系人、群聊或带特定标签的联系人。启用后，查询、导出、监控等命令默认应用隐藏规则（全文搜索除外）。
 
