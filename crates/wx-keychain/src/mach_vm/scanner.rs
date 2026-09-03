@@ -1455,7 +1455,7 @@ fn openssl_schedule_key_candidates(schedule: &[u8]) -> Vec<[u8; 32]> {
 fn decode_round_key(bytes: &[u8], swap_words: bool) -> [u8; 16] {
     let mut result: [u8; 16] = bytes.try_into().expect("AES round key size");
     if swap_words {
-        for word in result.chunks_exact_mut(4) {
+        for word in result.as_chunks_mut::<4>().0 {
             word.reverse();
         }
     }
@@ -1464,7 +1464,7 @@ fn decode_round_key(bytes: &[u8], swap_words: bool) -> [u8; 16] {
 
 #[cfg(windows)]
 fn mix_columns(block: &mut [u8; 16]) {
-    for column in block.chunks_exact_mut(4) {
+    for column in block.as_chunks_mut::<4>().0 {
         let first = column[0];
         let all = column[0] ^ column[1] ^ column[2] ^ column[3];
         column[0] ^= all ^ xtime(column[0] ^ column[1]);
