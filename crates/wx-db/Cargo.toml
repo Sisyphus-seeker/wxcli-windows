@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-prost = "0.13"
+prost = "0.14"
 zstd = "0.13"
 md5 = "0.8"
 thiserror = "2"
