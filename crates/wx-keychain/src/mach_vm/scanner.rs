@@ -1804,15 +1804,19 @@ mod tests {
         let key: [u8; 32] = std::array::from_fn(|index| index as u8);
         let mut schedule = [0u8; 240];
         for (source, destination) in key[..16]
-            .chunks_exact(4)
-            .zip(schedule[224..240].chunks_exact_mut(4))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(schedule[224..240].as_chunks_mut::<4>().0)
         {
             destination.copy_from_slice(source);
             destination.reverse();
         }
         for (source, destination) in key[16..]
-            .chunks_exact(4)
-            .zip(schedule[208..224].chunks_exact_mut(4))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(schedule[208..224].as_chunks_mut::<4>().0)
         {
             destination.copy_from_slice(source);
             destination.reverse();

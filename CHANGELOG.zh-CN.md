@@ -11,6 +11,10 @@
 - 新增 Windows x64 微信 4.1.13.12 的精确版本识别和启动阶段 SQLCipher 密钥文本捕获
 - 使用本机加密数据库验证新的捕获路径，并继续支持 4.1.11.24 和 4.1.12.26
 
+### 维护
+
+- 适配 Rust 1.98 Clippy 对固定大小缓冲区处理的新检查
+
 ### 文档
 
 - 统一 README 和 Agent Skill 中的 Windows 与 PowerShell 路径示例
