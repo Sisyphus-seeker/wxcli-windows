@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-09-04
+
+### Weixin 4.1.13.12 compatibility
+
+- Add exact version detection and startup-time SQLCipher passphrase capture for Windows x64 Weixin 4.1.13.12
+- Validate the new capture path against local encrypted databases while preserving support for 4.1.11.24 and 4.1.12.26
+
 ### Documentation
 
 - Use Windows and PowerShell paths consistently in the README and Agent Skill

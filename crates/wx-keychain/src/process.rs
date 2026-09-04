@@ -2,12 +2,12 @@ use std::path::{Path, PathBuf};
 
 use crate::error::KeychainError;
 
-pub const SUPPORTED_VERSION: &str = "4.1.12.26";
+pub const SUPPORTED_VERSION: &str = "4.1.13.12";
 
 /// Version prefixes accepted for Windows process-memory key extraction.
 /// Encryption params (PBKDF2-HMAC-SHA512, 256K iterations) are identical across these versions.
 const EXTRACTION_VERSION_PREFIXES: &[&str] = &["4.1.11"];
-const EXTRACTION_EXACT_VERSIONS: &[&str] = &["4.1.12.26"];
+const EXTRACTION_EXACT_VERSIONS: &[&str] = &["4.1.12.26", "4.1.13.12"];
 
 /// Check whether a version string is compatible with Windows key extraction.
 pub fn is_extraction_compatible(version: &str) -> bool {
@@ -437,8 +437,10 @@ mod tests {
     fn extraction_compatibility_is_exact_for_breakpoint_based_versions() {
         assert!(is_extraction_compatible("4.1.11.24"));
         assert!(is_extraction_compatible("4.1.12.26"));
+        assert!(is_extraction_compatible("4.1.13.12"));
         assert!(!is_extraction_compatible("4.1.12.25"));
         assert!(!is_extraction_compatible("4.1.12.27"));
-        assert!(!is_extraction_compatible("4.1.13.1"));
+        assert!(!is_extraction_compatible("4.1.13.11"));
+        assert!(!is_extraction_compatible("4.1.13.13"));
     }
 }

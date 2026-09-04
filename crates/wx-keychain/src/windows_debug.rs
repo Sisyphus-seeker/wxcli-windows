@@ -41,9 +41,11 @@ use wx_decrypt::{CryptoParams, EncKeyPair, KeyMaterial};
 
 const SUPPORTED_DEBUG_VERSION: &str = "4.1.11.24";
 const PASSPHRASE_DEBUG_VERSION: &str = "4.1.12.26";
+const PASSPHRASE_DEBUG_VERSION_4_1_13: &str = "4.1.13.12";
 const WEIXIN_DLL_NAME: &str = "Weixin.dll";
 const KEY_UNMASKED_BREAKPOINT_RVA: u64 = 0x0336_A1E7;
 const PASSPHRASE_BREAKPOINT_RVA: u64 = 0x0348_5AE0;
+const PASSPHRASE_BREAKPOINT_RVA_4_1_13: u64 = 0x035D_DE20;
 const TRAP_FLAG: u32 = 0x100;
 const KEY_MASK: [u8; 32] = [
     0x55, 0xE8, 0x9C, 0x9F, 0xCC, 0x23, 0xE3, 0x38, 0x2F, 0x46, 0x54, 0xD4, 0xF9, 0xD7, 0x23, 0x7E,
@@ -82,6 +84,22 @@ enum CaptureKind {
     WeixinPassphrase,
 }
 
+fn capture_config(version: &str) -> Option<(CaptureKind, u64)> {
+    match version {
+        SUPPORTED_DEBUG_VERSION => {
+            Some((CaptureKind::WeixinKeyBuffer, KEY_UNMASKED_BREAKPOINT_RVA))
+        }
+        PASSPHRASE_DEBUG_VERSION => {
+            Some((CaptureKind::WeixinPassphrase, PASSPHRASE_BREAKPOINT_RVA))
+        }
+        PASSPHRASE_DEBUG_VERSION_4_1_13 => Some((
+            CaptureKind::WeixinPassphrase,
+            PASSPHRASE_BREAKPOINT_RVA_4_1_13,
+        )),
+        _ => None,
+    }
+}
+
 pub fn capture_keys_windows_debug(
     pids: &[u32],
     accounts: &[AccountDirInfo],
@@ -89,15 +107,11 @@ pub fn capture_keys_windows_debug(
     timeout: Duration,
 ) -> Result<Vec<MemoryCaptureResult>, KeychainError> {
     let version = installed_weixin_version()?;
-    let capture_kind = if version == SUPPORTED_DEBUG_VERSION {
-        CaptureKind::WeixinKeyBuffer
-    } else if version == PASSPHRASE_DEBUG_VERSION {
-        CaptureKind::WeixinPassphrase
-    } else {
-        return Err(KeychainError::Other(format!(
-            "dynamic capture supports Weixin {SUPPORTED_DEBUG_VERSION} and {PASSPHRASE_DEBUG_VERSION}, found {version}"
-        )));
-    };
+    let (capture_kind, breakpoint_rva) = capture_config(&version).ok_or_else(|| {
+        KeychainError::Other(format!(
+            "dynamic capture supports Weixin {SUPPORTED_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION}, and {PASSPHRASE_DEBUG_VERSION_4_1_13}, found {version}"
+        ))
+    })?;
 
     let targets = collect_targets(accounts, params);
     if targets.is_empty() {
@@ -144,6 +158,7 @@ pub fn capture_keys_windows_debug(
             params,
             per_process.min(remaining),
             capture_kind,
+            breakpoint_rva,
         ) {
             Ok(mut keys) => captured.append(&mut keys),
             Err(error) => {
@@ -172,15 +187,11 @@ pub fn launch_and_capture_keys_windows_debug(
     timeout: Duration,
 ) -> Result<Vec<MemoryCaptureResult>, KeychainError> {
     let version = installed_weixin_version()?;
-    let capture_kind = if version == SUPPORTED_DEBUG_VERSION {
-        CaptureKind::WeixinKeyBuffer
-    } else if version == PASSPHRASE_DEBUG_VERSION {
-        CaptureKind::WeixinPassphrase
-    } else {
-        return Err(KeychainError::Other(format!(
-            "dynamic launch supports Weixin {SUPPORTED_DEBUG_VERSION} and {PASSPHRASE_DEBUG_VERSION}, found {version}"
-        )));
-    };
+    let (capture_kind, breakpoint_rva) = capture_config(&version).ok_or_else(|| {
+        KeychainError::Other(format!(
+            "dynamic launch supports Weixin {SUPPORTED_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION}, and {PASSPHRASE_DEBUG_VERSION_4_1_13}, found {version}"
+        ))
+    })?;
 
     let targets = collect_targets(accounts, params);
     if targets.is_empty() {
@@ -188,8 +199,16 @@ pub fn launch_and_capture_keys_windows_debug(
     }
     let executable = find_weixin_executable()?;
     eprintln!("Launching Weixin with startup key capture...");
-    let captured =
-        unsafe { capture_launched_process(&executable, &targets, params, timeout, capture_kind)? };
+    let captured = unsafe {
+        capture_launched_process(
+            &executable,
+            &targets,
+            params,
+            timeout,
+            capture_kind,
+            breakpoint_rva,
+        )?
+    };
     aggregate_results(captured, &targets, accounts)
 }
 
@@ -199,6 +218,7 @@ unsafe fn capture_launched_process(
     params: &CryptoParams,
     timeout: Duration,
     capture_kind: CaptureKind,
+    breakpoint_rva: u64,
 ) -> Result<Vec<(usize, [u8; 32])>, KeychainError> {
     let executable_wide = wide_null(executable.as_os_str());
     let working_directory_wide = executable
@@ -269,10 +289,6 @@ unsafe fn capture_launched_process(
                     });
                 if is_weixin_dll {
                     if let Some(state) = processes.get_mut(&event.dwProcessId) {
-                        let breakpoint_rva = match capture_kind {
-                            CaptureKind::WeixinKeyBuffer => KEY_UNMASKED_BREAKPOINT_RVA,
-                            CaptureKind::WeixinPassphrase => PASSPHRASE_BREAKPOINT_RVA,
-                        };
                         let address = info.lpBaseOfDll as u64 + breakpoint_rva;
                         if let Ok(original) = read_exact(state.handle, address, 1) {
                             if write_byte(state.handle, address, 0xCC).is_ok() {
@@ -460,15 +476,9 @@ fn capture_process(
     params: &CryptoParams,
     timeout: Duration,
     capture_kind: CaptureKind,
+    breakpoint_rva: u64,
 ) -> Result<Vec<(usize, [u8; 32])>, KeychainError> {
-    let breakpoint_address = match capture_kind {
-        CaptureKind::WeixinKeyBuffer => {
-            find_module_base(pid, WEIXIN_DLL_NAME)? + KEY_UNMASKED_BREAKPOINT_RVA
-        }
-        CaptureKind::WeixinPassphrase => {
-            find_module_base(pid, WEIXIN_DLL_NAME)? + PASSPHRASE_BREAKPOINT_RVA
-        }
-    };
+    let breakpoint_address = find_module_base(pid, WEIXIN_DLL_NAME)? + breakpoint_rva;
     let process = unsafe {
         OpenProcess(
             PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION,
