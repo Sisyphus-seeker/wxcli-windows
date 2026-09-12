@@ -3243,7 +3243,7 @@ version = "0.7.7"
 dependencies = [
  "aes",
  "base64",
- "cipher 0.4.4",
+ "cipher 0.5.2",
  "ecb",
  "hex",
  "md5",
