@@ -30,6 +30,6 @@ windows-sys = { version = "0.61", features = [
 [dev-dependencies]
 aes = "0.9"
 cbc = "0.2"
-hmac = "0.12"
+hmac = "0.13"
 sha2 = "0.10"
 tempfile = "3"
