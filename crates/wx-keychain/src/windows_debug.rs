@@ -42,10 +42,12 @@ use wx_decrypt::{CryptoParams, EncKeyPair, KeyMaterial};
 const SUPPORTED_DEBUG_VERSION: &str = "4.1.11.24";
 const PASSPHRASE_DEBUG_VERSION: &str = "4.1.12.26";
 const PASSPHRASE_DEBUG_VERSION_4_1_13: &str = "4.1.13.12";
+const PASSPHRASE_DEBUG_VERSION_4_1_15: &str = "4.1.15.10";
 const WEIXIN_DLL_NAME: &str = "Weixin.dll";
 const KEY_UNMASKED_BREAKPOINT_RVA: u64 = 0x0336_A1E7;
 const PASSPHRASE_BREAKPOINT_RVA: u64 = 0x0348_5AE0;
 const PASSPHRASE_BREAKPOINT_RVA_4_1_13: u64 = 0x035D_DE20;
+const PASSPHRASE_BREAKPOINT_RVA_4_1_15: u64 = 0x0356_8CD0;
 const TRAP_FLAG: u32 = 0x100;
 const KEY_MASK: [u8; 32] = [
     0x55, 0xE8, 0x9C, 0x9F, 0xCC, 0x23, 0xE3, 0x38, 0x2F, 0x46, 0x54, 0xD4, 0xF9, 0xD7, 0x23, 0x7E,
@@ -96,6 +98,10 @@ fn capture_config(version: &str) -> Option<(CaptureKind, u64)> {
             CaptureKind::WeixinPassphrase,
             PASSPHRASE_BREAKPOINT_RVA_4_1_13,
         )),
+        PASSPHRASE_DEBUG_VERSION_4_1_15 => Some((
+            CaptureKind::WeixinPassphrase,
+            PASSPHRASE_BREAKPOINT_RVA_4_1_15,
+        )),
         _ => None,
     }
 }
@@ -109,7 +115,7 @@ pub fn capture_keys_windows_debug(
     let version = installed_weixin_version()?;
     let (capture_kind, breakpoint_rva) = capture_config(&version).ok_or_else(|| {
         KeychainError::Other(format!(
-            "dynamic capture supports Weixin {SUPPORTED_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION}, and {PASSPHRASE_DEBUG_VERSION_4_1_13}, found {version}"
+            "dynamic capture supports Weixin {SUPPORTED_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION_4_1_13}, and {PASSPHRASE_DEBUG_VERSION_4_1_15}, found {version}"
         ))
     })?;
 
@@ -189,7 +195,7 @@ pub fn launch_and_capture_keys_windows_debug(
     let version = installed_weixin_version()?;
     let (capture_kind, breakpoint_rva) = capture_config(&version).ok_or_else(|| {
         KeychainError::Other(format!(
-            "dynamic launch supports Weixin {SUPPORTED_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION}, and {PASSPHRASE_DEBUG_VERSION_4_1_13}, found {version}"
+            "dynamic launch supports Weixin {SUPPORTED_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION_4_1_13}, and {PASSPHRASE_DEBUG_VERSION_4_1_15}, found {version}"
         ))
     })?;
 

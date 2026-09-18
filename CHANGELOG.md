@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-09-18
+
+### Weixin 4.1.15.10 compatibility
+
+- Add exact version detection and startup-time SQLCipher passphrase capture for Windows x64 Weixin 4.1.15.10
+- Verify message queries and key capture against local encrypted databases while preserving support for earlier verified Weixin versions
+
 ## [0.7.7] - 2026-09-04
 
 ### Weixin 4.1.13.12 compatibility
