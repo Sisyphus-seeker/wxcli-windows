@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Add Weixin 4.1.15.13 x64 capture configuration with an entry signature check before installing a breakpoint. Locally validated key capture during login and fresh message queries; not released yet. Some auxiliary/media databases can still lack keys.
+
 ## [0.7.8] - 2026-09-18
 
 ### Weixin 4.1.15.10 compatibility

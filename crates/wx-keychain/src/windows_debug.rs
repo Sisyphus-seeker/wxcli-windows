@@ -43,11 +43,20 @@ const SUPPORTED_DEBUG_VERSION: &str = "4.1.11.24";
 const PASSPHRASE_DEBUG_VERSION: &str = "4.1.12.26";
 const PASSPHRASE_DEBUG_VERSION_4_1_13: &str = "4.1.13.12";
 const PASSPHRASE_DEBUG_VERSION_4_1_15: &str = "4.1.15.10";
+const PASSPHRASE_DEBUG_VERSION_4_1_15_13: &str = "4.1.15.13";
 const WEIXIN_DLL_NAME: &str = "Weixin.dll";
 const KEY_UNMASKED_BREAKPOINT_RVA: u64 = 0x0336_A1E7;
 const PASSPHRASE_BREAKPOINT_RVA: u64 = 0x0348_5AE0;
 const PASSPHRASE_BREAKPOINT_RVA_4_1_13: u64 = 0x035D_DE20;
 const PASSPHRASE_BREAKPOINT_RVA_4_1_15: u64 = 0x0356_8CD0;
+// x64 Weixin.dll 4.1.15.13: codec pass setter, RCX=codec, RDX=pass, R8D=len.
+// Verified statically against DLL SHA256:
+// 10f8e995453e2da46d4f2b5080cd6da1f13cc5147746adc119ceae38cb039de5.
+const PASSPHRASE_BREAKPOINT_RVA_4_1_15_13: u64 = 0x0356_9390;
+const PASSPHRASE_ENTRY_4_1_15_13: &[u8] = &[
+    0x41, 0x57, 0x41, 0x56, 0x41, 0x54, 0x56, 0x57, 0x55, 0x53, 0x48, 0x83, 0xEC, 0x20, 0x44, 0x89,
+    0xCF, 0x44, 0x89, 0xC5, 0x49, 0x89, 0xD6, 0x48, 0x89, 0xCE,
+];
 const TRAP_FLAG: u32 = 0x100;
 const KEY_MASK: [u8; 32] = [
     0x55, 0xE8, 0x9C, 0x9F, 0xCC, 0x23, 0xE3, 0x38, 0x2F, 0x46, 0x54, 0xD4, 0xF9, 0xD7, 0x23, 0x7E,
@@ -102,6 +111,10 @@ fn capture_config(version: &str) -> Option<(CaptureKind, u64)> {
             CaptureKind::WeixinPassphrase,
             PASSPHRASE_BREAKPOINT_RVA_4_1_15,
         )),
+        PASSPHRASE_DEBUG_VERSION_4_1_15_13 => Some((
+            CaptureKind::WeixinPassphrase,
+            PASSPHRASE_BREAKPOINT_RVA_4_1_15_13,
+        )),
         _ => None,
     }
 }
@@ -115,7 +128,7 @@ pub fn capture_keys_windows_debug(
     let version = installed_weixin_version()?;
     let (capture_kind, breakpoint_rva) = capture_config(&version).ok_or_else(|| {
         KeychainError::Other(format!(
-            "dynamic capture supports Weixin {SUPPORTED_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION_4_1_13}, and {PASSPHRASE_DEBUG_VERSION_4_1_15}, found {version}"
+            "dynamic capture supports Weixin {SUPPORTED_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION_4_1_13}, {PASSPHRASE_DEBUG_VERSION_4_1_15}, and {PASSPHRASE_DEBUG_VERSION_4_1_15_13}, found {version}"
         ))
     })?;
 
@@ -195,7 +208,7 @@ pub fn launch_and_capture_keys_windows_debug(
     let version = installed_weixin_version()?;
     let (capture_kind, breakpoint_rva) = capture_config(&version).ok_or_else(|| {
         KeychainError::Other(format!(
-            "dynamic launch supports Weixin {SUPPORTED_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION_4_1_13}, and {PASSPHRASE_DEBUG_VERSION_4_1_15}, found {version}"
+            "dynamic launch supports Weixin {SUPPORTED_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION}, {PASSPHRASE_DEBUG_VERSION_4_1_13}, {PASSPHRASE_DEBUG_VERSION_4_1_15}, and {PASSPHRASE_DEBUG_VERSION_4_1_15_13}, found {version}"
         ))
     })?;
 
@@ -296,13 +309,18 @@ unsafe fn capture_launched_process(
                 if is_weixin_dll {
                     if let Some(state) = processes.get_mut(&event.dwProcessId) {
                         let address = info.lpBaseOfDll as u64 + breakpoint_rva;
-                        if let Ok(original) = read_exact(state.handle, address, 1) {
-                            if write_byte(state.handle, address, 0xCC).is_ok() {
-                                state.breakpoint = Some(BreakpointState {
-                                    address,
-                                    original: original[0],
-                                    installed: true,
-                                });
+                        match checked_breakpoint_original(state.handle, address, breakpoint_rva) {
+                            Ok(original) => {
+                                if write_byte(state.handle, address, 0xCC).is_ok() {
+                                    state.breakpoint = Some(BreakpointState {
+                                        address,
+                                        original,
+                                        installed: true,
+                                    });
+                                }
+                            }
+                            Err(error) => {
+                                eprintln!("Skipping capture in pid {}: {error}", event.dwProcessId)
                             }
                         }
                     }
@@ -494,6 +512,11 @@ fn capture_process(
     };
     if process.is_null() {
         return Err(last_error(format!("OpenProcess({pid})")));
+    }
+
+    if let Err(error) = checked_breakpoint_original(process, breakpoint_address, breakpoint_rva) {
+        unsafe { CloseHandle(process) };
+        return Err(error);
     }
 
     let result = unsafe {
@@ -978,6 +1001,24 @@ fn set_thread_context(thread_id: u32, context: &CONTEXT) -> Result<(), KeychainE
     }
 }
 
+fn checked_breakpoint_original(
+    process: HANDLE,
+    address: u64,
+    rva: u64,
+) -> Result<u8, KeychainError> {
+    if rva == PASSPHRASE_BREAKPOINT_RVA_4_1_15_13 {
+        let bytes = read_exact(process, address, PASSPHRASE_ENTRY_4_1_15_13.len())?;
+        if bytes != PASSPHRASE_ENTRY_4_1_15_13 {
+            return Err(KeychainError::Other(
+                "Weixin capture entry signature mismatch; refusing to install breakpoint".into(),
+            ));
+        }
+        Ok(bytes[0])
+    } else {
+        Ok(read_exact(process, address, 1)?[0])
+    }
+}
+
 fn read_exact(process: HANDLE, address: u64, length: usize) -> Result<Vec<u8>, KeychainError> {
     let mut bytes = vec![0u8; length];
     let mut read = 0usize;
@@ -1046,4 +1087,24 @@ fn last_error(operation: impl Into<String>) -> KeychainError {
         operation.into(),
         std::io::Error::last_os_error()
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capture_offsets_are_version_specific() {
+        assert!(matches!(
+            capture_config("4.1.15.13"),
+            Some((CaptureKind::WeixinPassphrase, 0x0356_9390))
+        ));
+        assert!(matches!(
+            capture_config("4.1.15.10"),
+            Some((CaptureKind::WeixinPassphrase, 0x0356_8CD0))
+        ));
+        for version in ["4.1.15", "4.1.15.12", "4.1.15.14", "4.1.15.130"] {
+            assert!(capture_config(version).is_none());
+        }
+    }
 }
