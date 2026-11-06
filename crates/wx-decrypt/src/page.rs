@@ -1,6 +1,6 @@
 use aes::cipher::{block_padding::NoPadding, BlockModeDecrypt, KeyIvInit};
-use hmac::{Hmac, Mac};
-use sha2::Sha512;
+use hmac::{Hmac, KeyInit as HmacKeyInit, Mac};
+use sha2_hmac::Sha512;
 
 use crate::error::DecryptError;
 use crate::params::CryptoParams;

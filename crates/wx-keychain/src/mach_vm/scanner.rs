@@ -1570,8 +1570,8 @@ mod tests {
 
     fn build_first_page(enc_key: &[u8; 32], salt: &[u8; 16]) -> Vec<u8> {
         use aes::cipher::{block_padding::NoPadding, BlockModeEncrypt, KeyIvInit};
-        use hmac::{Hmac, Mac};
-        use sha2::Sha512;
+        use hmac::{Hmac, KeyInit as HmacKeyInit, Mac};
+        use sha2_hmac::Sha512;
 
         let params = &MACOS_4_1_7_31;
         let iv = [0x42u8; 16];
@@ -1593,7 +1593,7 @@ mod tests {
 
         let hmac_data_end = params.page_size - params.reserve + params.iv_size;
         let mac_key = wx_decrypt::kdf::derive_mac_key(enc_key, salt, params);
-        let mut mac = <Hmac<Sha512> as Mac>::new_from_slice(&mac_key).unwrap();
+        let mut mac = <Hmac<Sha512> as HmacKeyInit>::new_from_slice(&mac_key).unwrap();
         mac.update(&page[params.salt_size..hmac_data_end]);
         mac.update(&1u32.to_le_bytes());
         let hmac_result = mac.finalize().into_bytes();

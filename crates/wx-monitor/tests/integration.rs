@@ -36,8 +36,8 @@ fn encrypt_page(
     salt: &[u8; 16],
 ) -> Vec<u8> {
     use aes::cipher::{BlockModeEncrypt, KeyIvInit};
-    use hmac::{Hmac, Mac};
-    use sha2::Sha512;
+    use hmac::{Hmac, KeyInit as HmacKeyInit, Mac};
+    use sha2_hmac::Sha512;
 
     let params = &MACOS_4_1_7_31;
     let iv: [u8; 16] = [0x42; 16];
@@ -67,7 +67,7 @@ fn encrypt_page(
 
     // Compute HMAC
     let hmac_data_end = params.page_size - params.reserve + params.iv_size;
-    let mut mac = <Hmac<Sha512> as Mac>::new_from_slice(mac_key).unwrap();
+    let mut mac = <Hmac<Sha512> as HmacKeyInit>::new_from_slice(mac_key).unwrap();
     mac.update(&page[offset..hmac_data_end]);
     mac.update(&(page_num + 1).to_le_bytes()); // 1-indexed
     let hmac_result = mac.finalize().into_bytes();

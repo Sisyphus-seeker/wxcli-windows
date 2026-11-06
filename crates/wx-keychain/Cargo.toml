@@ -32,4 +32,6 @@ aes = "0.9"
 cbc = "0.2"
 hmac = "0.13"
 sha2 = "0.10"
+# HMAC 0.13 uses digest 0.11; PBKDF2 0.12 retains sha2 0.10.
+sha2_hmac = { package = "sha2", version = "0.11" }
 tempfile = "3"
