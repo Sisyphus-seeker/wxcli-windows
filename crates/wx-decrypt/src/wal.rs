@@ -382,8 +382,8 @@ mod tests {
         salt: Option<&[u8; 16]>,
     ) -> Vec<u8> {
         use aes::cipher::{block_padding::NoPadding, BlockModeEncrypt, KeyIvInit};
-        use hmac::{Hmac, Mac};
-        use sha2::Sha512;
+        use hmac::{Hmac, KeyInit as HmacKeyInit, Mac};
+        use sha2_hmac::Sha512;
 
         type HmacSha512 = Hmac<Sha512>;
         type Aes256CbcEnc = cbc::Encryptor<aes::Aes256>;

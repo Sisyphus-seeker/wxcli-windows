@@ -272,8 +272,8 @@ mod tests {
     /// Build a minimal encrypted session.db that `decrypt_db` can process.
     fn build_encrypted_session_db(path: &Path, raw_key: &[u8; 32]) -> PathBuf {
         use aes::cipher::{BlockModeEncrypt, KeyIvInit};
-        use hmac::{Hmac, Mac};
-        use sha2::Sha512;
+        use hmac::{Hmac, KeyInit as HmacKeyInit, Mac};
+        use sha2_hmac::Sha512;
 
         let params = &MACOS_4_1_7_31;
         let salt: [u8; 16] = [0x01; 16];
@@ -326,7 +326,7 @@ mod tests {
 
         // Compute HMAC over: page[salt_size..page_size - reserve + iv_size] + page_num(1, LE)
         let hmac_data_end = params.page_size - params.reserve + params.iv_size;
-        let mut mac = <Hmac<Sha512> as Mac>::new_from_slice(&mac_key).unwrap();
+        let mut mac = <Hmac<Sha512> as HmacKeyInit>::new_from_slice(&mac_key).unwrap();
         mac.update(&page[params.salt_size..hmac_data_end]);
         mac.update(&1u32.to_le_bytes()); // page number is 1-indexed
         let hmac_result = mac.finalize().into_bytes();

@@ -9,8 +9,8 @@ fn build_encrypted_db(
     params: &wx_decrypt::CryptoParams,
 ) {
     use aes::cipher::{BlockModeEncrypt, KeyIvInit};
-    use hmac::{Hmac, Mac};
-    use sha2::Sha512;
+    use hmac::{Hmac, KeyInit as HmacKeyInit, Mac};
+    use sha2_hmac::Sha512;
 
     let enc_key = wx_decrypt::kdf::derive_enc_key(raw_key, salt, params);
     let mac_key = wx_decrypt::kdf::derive_mac_key(&enc_key, salt, params);
@@ -32,7 +32,7 @@ fn build_encrypted_db(
     page.resize(params.page_size, 0);
 
     let hmac_data_end = params.page_size - params.reserve + params.iv_size;
-    let mut mac = <Hmac<Sha512> as Mac>::new_from_slice(&mac_key).unwrap();
+    let mut mac = <Hmac<Sha512> as HmacKeyInit>::new_from_slice(&mac_key).unwrap();
     mac.update(&page[params.salt_size..hmac_data_end]);
     mac.update(&1u32.to_le_bytes());
     let hmac_result = mac.finalize().into_bytes();
