@@ -20,7 +20,10 @@ jobs:
       - run: cargo fmt --check
 
   clippy:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -29,8 +32,18 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
-    runs-on: windows-latest
+    name: ${{ matrix.name }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            name: test (macos-latest, --features audio)
+            features: --features audio
+          - os: windows-latest
+            name: test (windows-latest)
+            features: ''
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --workspace
+      - run: cargo test --workspace --locked ${{ matrix.features }}
