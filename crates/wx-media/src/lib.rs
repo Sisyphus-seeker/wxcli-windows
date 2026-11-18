@@ -82,7 +82,7 @@ mod voice;
 pub mod wxgf;
 
 pub use audio_transcode::{transcode_silk_to_mp3, transcode_silk_to_ogg_opus};
-pub use dat::{decrypt_dat, detect_dat_format, detect_image_type, detect_xor_key};
+pub use dat::{aes_ecb_decrypt, decrypt_dat, detect_dat_format, detect_image_type, detect_xor_key};
 pub use error::MediaError;
 pub use fallback::{find_file_by_name, find_video_by_md5};
 pub use ffmpeg::{

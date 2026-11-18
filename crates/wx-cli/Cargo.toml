@@ -38,6 +38,7 @@ tower-http = { version = "0.7", features = ["cors", "fs"] }
 tower = { version = "0.5", features = ["util"] }
 libc = "0.2"
 lru = "0.19"
+tempfile = "3"
 rayon = "1"
 
 [target.'cfg(windows)'.dependencies]

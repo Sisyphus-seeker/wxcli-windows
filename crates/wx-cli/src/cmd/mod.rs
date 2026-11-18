@@ -16,6 +16,7 @@ pub mod serve;
 pub mod server;
 pub mod sessions;
 pub mod status;
+pub mod stickers;
 pub mod thin_client;
 pub mod watch;
 
