@@ -202,6 +202,25 @@ REST 端点：`/api/v1/health`、`/api/v1/sessions`、`/api/v1/contacts`、`/api
 
 ## 命令一览
 
+### 导出收藏表情包
+
+从当前账号的收藏表情数据库下载 GIF、PNG 等原始图片，保留动图格式。
+
+```powershell
+wx-cli export-stickers -o .\stickers
+wx-cli export-stickers --account <account_id> -o .\stickers
+# 使用已解密的表情数据库
+wx-cli export-stickers --db .\emoticon.db -o .\stickers
+# 使用已有下载清单（兼容 fav_stickers.json）
+wx-cli export-stickers --manifest .\fav_stickers.json -o .\stickers
+```
+
+账号模式需要已保存且适用于 `emoticon/emoticon.db` 的数据库密钥。命令刷新该库的解密缓存，筛选收藏表情，按 MD5 命名图片，支持加密 CDN 资源的 AES-128-ECB 解密。重复运行会跳过已存在且能识别的图片，并重试失败项。
+
+输出目录中的 `stickers-report.json` 记录每项的文件路径或失败原因。存在失败项时命令返回非零退出码，已成功导出的图片会保留。下载地址失效、网络错误或缺少对应密钥的项目可能无法导出。下载清单包含资源地址和密钥，请妥善保管。此命令处理收藏表情，微信“收藏”页面中的普通图片、文章和文件尚未支持。
+
+### 命令列表
+
 | 命令 | 说明 |
 |------|------|
 | `wx-cli status` | 查看 WeChat 运行状态 |

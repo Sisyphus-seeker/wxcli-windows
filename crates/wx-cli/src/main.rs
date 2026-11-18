@@ -56,6 +56,8 @@ impl From<ServerRoutingArgs> for ThinClientCliArgs {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Export favorite WeChat stickers, downloading missing images
+    ExportStickers(cmd::stickers::StickerArgs),
     /// Manage encryption keys
     Key {
         #[command(subcommand)]
@@ -579,6 +581,7 @@ async fn main() {
             KeyAction::Scan => cmd::key::cmd_key_scan(),
         },
         Commands::Media { action } => cmd::media::cmd_media(action),
+        Commands::ExportStickers(args) => cmd::stickers::run(args),
         Commands::Watch {
             key,
             data_dir,
