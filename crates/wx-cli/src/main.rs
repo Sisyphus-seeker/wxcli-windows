@@ -56,6 +56,8 @@ impl From<ServerRoutingArgs> for ThinClientCliArgs {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Describe group chat images or ask a visual model a question (uploads images)
+    RecognizeImages(cmd::image_understand::ImageArgs),
     /// Export favorite WeChat stickers, downloading missing images
     ExportStickers(cmd::stickers::StickerArgs),
     /// Manage encryption keys
@@ -582,6 +584,7 @@ async fn main() {
         },
         Commands::Media { action } => cmd::media::cmd_media(action),
         Commands::ExportStickers(args) => cmd::stickers::run(args),
+        Commands::RecognizeImages(args) => cmd::image_understand::run(args),
         Commands::Watch {
             key,
             data_dir,

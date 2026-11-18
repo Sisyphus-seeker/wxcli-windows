@@ -6,6 +6,7 @@ pub mod doctor;
 pub mod export;
 pub mod export_media;
 pub mod export_task;
+pub mod image_understand;
 pub mod info;
 pub mod key;
 pub mod media;

@@ -3158,6 +3158,7 @@ name = "wx-cli"
 version = "0.7.8"
 dependencies = [
  "axum",
+ "base64",
  "chrono",
  "clap 4.6.4",
  "futures-util",
