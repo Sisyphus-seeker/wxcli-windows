@@ -5,6 +5,8 @@ use crate::db_category::{DbCategory, DbFile};
 /// Which databases to decrypt.
 #[derive(Debug, Clone)]
 pub enum DecryptScope {
+    /// Specific paths relative to db_storage.
+    Paths(Vec<std::path::PathBuf>),
     /// Decrypt everything.
     All,
     /// Only contact.db + session.db.
@@ -29,6 +31,7 @@ impl DecryptScope {
     /// Check whether a given DB file is included in this scope.
     pub fn matches(&self, db: &DbFile) -> bool {
         match self {
+            Self::Paths(paths) => paths.iter().any(|path| db.path.ends_with(path)),
             Self::All => true,
             Self::Core => matches!(db.category, DbCategory::Contact | DbCategory::Session),
             Self::Categories(cats) => cats.contains(&db.category),
@@ -58,6 +61,14 @@ mod tests {
         assert!(scope.matches(&db("message_0")));
         assert!(scope.matches(&db("message_fts")));
         assert!(scope.matches(&db("other")));
+    }
+
+    #[test]
+    fn paths_only_matches_selected_database() {
+        let scope = DecryptScope::Paths(vec![PathBuf::from("emoticon/emoticon.db")]);
+        assert!(scope.matches(&db("emoticon/emoticon")));
+        assert!(!scope.matches(&db("message_0")));
+        assert!(!scope.matches(&db("favorite/emoticon")));
     }
 
     #[test]

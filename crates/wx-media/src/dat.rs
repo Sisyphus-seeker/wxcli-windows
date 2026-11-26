@@ -180,7 +180,7 @@ fn decrypt_v1_v2(
 }
 
 /// AES-128-ECB decrypt with PKCS7 unpadding.
-fn aes_ecb_decrypt(ciphertext: &[u8], key: &[u8; 16]) -> Result<Vec<u8>, MediaError> {
+pub fn aes_ecb_decrypt(ciphertext: &[u8], key: &[u8; 16]) -> Result<Vec<u8>, MediaError> {
     use aes::cipher::{BlockCipherDecrypt, KeyInit};
     use aes::Aes128;
 
@@ -300,6 +300,23 @@ fn walkdir_thumbnails(dir: &Path) -> Vec<std::fs::DirEntry> {
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn sticker_ecb_roundtrip_and_bad_padding() {
+        use aes::cipher::{BlockCipherEncrypt, KeyInit};
+        let key = [7u8; 16];
+        let original = b"GIF89a sticker";
+        let mut encrypted = original.to_vec();
+        let padding = 16 - encrypted.len() % 16;
+        encrypted.resize(encrypted.len() + padding, padding as u8);
+        let cipher = aes::Aes128::new((&key).into());
+        for block in encrypted.as_chunks_mut::<16>().0 {
+            cipher.encrypt_block(block.into());
+        }
+        assert_eq!(aes_ecb_decrypt(&encrypted, &key).unwrap(), original);
+        assert!(aes_ecb_decrypt(&encrypted[..15], &key).is_err());
+        assert!(aes_ecb_decrypt(&encrypted, &[8; 16]).is_err());
+    }
 
     #[test]
     fn test_detect_xor_key_from_thumbnails() {
