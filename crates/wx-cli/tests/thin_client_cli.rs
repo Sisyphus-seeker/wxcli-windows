@@ -23,7 +23,10 @@ fn sessions_can_use_remote_json_path() {
             assert!(request.contains("offset=0"));
             assert!(request.contains("order=desc"));
             assert!(!request.contains("show_hidden="));
-            assert!(request.contains("Authorization: Bearer secret-token\r\n"));
+            assert!(request.lines().any(|line| line
+                .split_once(':')
+                .is_some_and(|(name, value)| name.eq_ignore_ascii_case("authorization")
+                    && value.trim() == "Bearer secret-token")));
             empty_envelope_response()
         }
         _ => unreachable!(),

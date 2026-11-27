@@ -1,5 +1,5 @@
 use pbkdf2::pbkdf2_hmac;
-use sha2::Sha512;
+use sha2_hmac::Sha512;
 
 use crate::params::CryptoParams;
 
@@ -26,6 +26,28 @@ pub fn derive_mac_key(enc_key: &[u8; 32], salt: &[u8; 16], _params: &CryptoParam
 mod tests {
     use super::*;
     use crate::params::MACOS_4_1_7_31;
+
+    // Fixed outputs independently generated with Python hashlib.pbkdf2_hmac.
+    #[test]
+    fn pbkdf2_sha512_matches_independent_vector() {
+        let mut params = MACOS_4_1_7_31;
+        params.kdf_iter = 2;
+        let enc = derive_enc_key(&[0xab; 32], &[1; 16], &params);
+        assert_eq!(
+            enc,
+            [
+                52, 150, 210, 79, 213, 113, 142, 21, 117, 228, 9, 43, 149, 24, 195, 149, 56, 65,
+                45, 95, 104, 97, 247, 108, 12, 117, 81, 190, 124, 161, 62, 13
+            ]
+        );
+        assert_eq!(
+            derive_mac_key(&enc, &[1; 16], &params),
+            [
+                19, 123, 7, 109, 230, 226, 228, 21, 176, 33, 132, 220, 173, 125, 205, 52, 131, 97,
+                251, 219, 75, 230, 173, 12, 138, 222, 245, 205, 24, 116, 250, 90
+            ]
+        );
+    }
 
     #[test]
     fn test_derive_keys_deterministic() {

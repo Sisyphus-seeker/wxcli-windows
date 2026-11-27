@@ -154,10 +154,12 @@ pub struct ThinClient {
 
 impl ThinClient {
     pub fn new(options: ThinClientOptions) -> Self {
-        let agent = ureq::AgentBuilder::new()
-            .timeout_connect(Duration::from_millis(CONNECT_TIMEOUT_MS))
-            .timeout_read(Duration::from_millis(READ_TIMEOUT_MS))
-            .build();
+        let agent = ureq::Agent::config_builder()
+            .timeout_connect(Some(Duration::from_millis(CONNECT_TIMEOUT_MS)))
+            .timeout_per_read(Some(Duration::from_millis(READ_TIMEOUT_MS)))
+            .http_status_as_error(false)
+            .build()
+            .new_agent();
         Self { options, agent }
     }
 
@@ -181,12 +183,26 @@ impl ThinClient {
         let url = build_url(&self.options.base_url, path, query)?;
         let mut request = self.agent.get(url.as_str());
         if let Some(token) = &self.options.token {
-            request = request.set("Authorization", &format!("Bearer {token}"));
+            request = request.header("Authorization", &format!("Bearer {token}"));
         }
 
-        let response = request.call().map_err(classify_ureq_error)?;
+        let mut response = request.call().map_err(classify_ureq_error)?;
+        let code = response.status().as_u16();
+        if code >= 400 {
+            let kind = match code {
+                401 => ThinClientErrorKind::Unauthorized,
+                400..=499 => ThinClientErrorKind::BadRequest,
+                _ => ThinClientErrorKind::Server,
+            };
+            let body = response
+                .body_mut()
+                .read_to_string()
+                .unwrap_or_else(|_| "request failed".into());
+            return Err(ThinClientError::new(kind, body));
+        }
         response
-            .into_json::<T>()
+            .body_mut()
+            .read_json::<T>()
             .map_err(|err| ThinClientError::new(ThinClientErrorKind::Decode, err.to_string()))
     }
 }
@@ -201,7 +217,7 @@ fn build_url(
     let mut url = base
         .join(path.trim_start_matches('/'))
         .map_err(|err| ThinClientError::new(ThinClientErrorKind::BadRequest, err.to_string()))?;
-    {
+    if !query.is_empty() {
         let mut pairs = url.query_pairs_mut();
         for (key, value) in query {
             pairs.append_pair(key, value);
@@ -211,21 +227,7 @@ fn build_url(
 }
 
 fn classify_ureq_error(err: ureq::Error) -> ThinClientError {
-    match err {
-        ureq::Error::Status(code, response) => {
-            let body = response
-                .into_string()
-                .unwrap_or_else(|_| String::from("request failed"));
-            match code {
-                401 => ThinClientError::new(ThinClientErrorKind::Unauthorized, body),
-                400..=499 => ThinClientError::new(ThinClientErrorKind::BadRequest, body),
-                _ => ThinClientError::new(ThinClientErrorKind::Server, body),
-            }
-        }
-        ureq::Error::Transport(transport) => {
-            ThinClientError::new(ThinClientErrorKind::Unavailable, transport.to_string())
-        }
-    }
+    ThinClientError::new(ThinClientErrorKind::Unavailable, err.to_string())
 }
 
 fn simplify_unavailable_message(message: &str) -> &str {

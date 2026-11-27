@@ -292,17 +292,18 @@ pub fn probe_health(
     base_url: &str,
     token: Option<&str>,
 ) -> Result<ServerHealthPayload, Box<dyn std::error::Error>> {
-    let agent = ureq::AgentBuilder::new()
-        .timeout_connect(Duration::from_millis(250))
-        .timeout_read(Duration::from_millis(750))
-        .build();
+    let agent = ureq::Agent::config_builder()
+        .timeout_connect(Some(Duration::from_millis(250)))
+        .timeout_per_read(Some(Duration::from_millis(750)))
+        .build()
+        .new_agent();
     let url = format!("{}/api/v1/health", base_url.trim_end_matches('/'));
     let mut request = agent.get(&url);
     if let Some(token) = token {
-        request = request.set("Authorization", &format!("Bearer {token}"));
+        request = request.header("Authorization", &format!("Bearer {token}"));
     }
-    let response = request.call()?;
-    Ok(response.into_json::<ServerHealthPayload>()?)
+    let mut response = request.call()?;
+    Ok(response.body_mut().read_json::<ServerHealthPayload>()?)
 }
 
 #[derive(Clone, Debug)]

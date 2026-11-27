@@ -966,7 +966,7 @@ mod tests {
         params: &wx_decrypt::CryptoParams,
     ) -> [u8; 32] {
         let mut key = [0u8; 32];
-        pbkdf2::pbkdf2_hmac::<sha2::Sha512>(raw_key, salt, params.kdf_iter, &mut key);
+        pbkdf2::pbkdf2_hmac::<sha2_hmac::Sha512>(raw_key, salt, params.kdf_iter, &mut key);
         key
     }
 
@@ -986,7 +986,7 @@ mod tests {
             mac_salt[i] = b ^ 0x3a;
         }
         let mut mac_key = [0u8; 32];
-        pbkdf2::pbkdf2_hmac::<sha2::Sha512>(&enc_key, &mac_salt, 2, &mut mac_key);
+        pbkdf2::pbkdf2_hmac::<sha2_hmac::Sha512>(&enc_key, &mac_salt, 2, &mut mac_key);
 
         let iv = [0x42u8; 16];
         let data_size = params.page_size - params.reserve - params.salt_size;

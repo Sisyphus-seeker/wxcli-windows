@@ -112,7 +112,10 @@ fn probe_health_does_not_append_empty_query_marker() {
 fn get_json_sends_bearer_token() {
     let (base_url, handle) = spawn_mock_server(|request| {
         assert!(request.starts_with("GET /api/v1/contacts?limit=10"));
-        assert!(request.contains("Authorization: Bearer secret-token\r\n"));
+        assert!(request.lines().any(|line| line
+            .split_once(':')
+            .is_some_and(|(name, value)| name.eq_ignore_ascii_case("authorization")
+                && value.trim() == "Bearer secret-token")));
         http_response("200 OK", "{\"ok\":true}")
     });
 
@@ -156,9 +159,17 @@ fn spawn_mock_server(
     let addr = listener.local_addr().expect("mock server addr");
     let handle = thread::spawn(move || {
         let (mut stream, _) = listener.accept().expect("accept");
-        let mut buf = [0_u8; 8192];
-        let n = stream.read(&mut buf).expect("read request");
-        let request = String::from_utf8_lossy(&buf[..n]).into_owned();
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .unwrap();
+        let mut buf = Vec::new();
+        while !buf.ends_with(b"\r\n\r\n") {
+            let mut byte = [0];
+            stream.read_exact(&mut byte).expect("read request");
+            buf.push(byte[0]);
+            assert!(buf.len() < 8192, "request headers too large");
+        }
+        let request = String::from_utf8_lossy(&buf).into_owned();
         let response = responder(request);
         stream
             .write_all(response.as_bytes())

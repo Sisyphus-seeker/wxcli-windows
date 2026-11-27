@@ -9,7 +9,7 @@ use wx_monitor::{MonitorConfig, WechatMonitor};
 
 fn derive_enc_key(raw_key: &[u8; 32], salt: &[u8; 16]) -> [u8; 32] {
     let mut key = [0u8; 32];
-    pbkdf2::pbkdf2_hmac::<sha2::Sha512>(raw_key, salt, MACOS_4_1_7_31.kdf_iter, &mut key);
+    pbkdf2::pbkdf2_hmac::<sha2_hmac::Sha512>(raw_key, salt, MACOS_4_1_7_31.kdf_iter, &mut key);
     key
 }
 
@@ -19,7 +19,7 @@ fn derive_mac_key(enc_key: &[u8; 32], salt: &[u8; 16]) -> [u8; 32] {
         mac_salt[i] = b ^ 0x3a;
     }
     let mut key = [0u8; 32];
-    pbkdf2::pbkdf2_hmac::<sha2::Sha512>(enc_key, &mac_salt, 2, &mut key);
+    pbkdf2::pbkdf2_hmac::<sha2_hmac::Sha512>(enc_key, &mac_salt, 2, &mut key);
     key
 }
 
