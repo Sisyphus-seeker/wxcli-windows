@@ -55,13 +55,27 @@ fn extract_wxid_from_data_dir(data_dir: &Path) -> Result<String, MediaError> {
 /// └── xwechat_files/<wxid_xxx_XXXX>/   ← data_dir
 /// ```
 ///
-/// This function tries two locations:
+/// This function tries these locations:
 /// 1. `<data_dir>/app_data/radium/ilink/` (for tests / alternative layouts)
 /// 2. `<data_dir>/../../app_data/radium/ilink/` (standard macOS layout)
+/// 3. `%APPDATA%/Tencent/xwechat/radium/ilink/` on Windows, with a matching account suffix
 ///
 /// When multiple accounts exist under ilink, the `account_suffix` (e.g. `ab12`
 /// from `wxid_xxx_ab12`) is used to match the correct subdirectory.
 pub fn read_uin(data_dir: &Path) -> Result<String, MediaError> {
+    let windows_ilink = if cfg!(windows) {
+        std::env::var_os("APPDATA")
+            .map(|root| std::path::PathBuf::from(root).join("Tencent/xwechat/radium/ilink"))
+    } else {
+        None
+    };
+    read_uin_with_windows_ilink(data_dir, windows_ilink.as_deref())
+}
+
+fn read_uin_with_windows_ilink(
+    data_dir: &Path,
+    windows_ilink: Option<&Path>,
+) -> Result<String, MediaError> {
     let suffix =
         extract_account_suffix(data_dir.file_name().and_then(|n| n.to_str()).unwrap_or(""));
 
@@ -80,15 +94,20 @@ pub fn read_uin(data_dir: &Path) -> Result<String, MediaError> {
         if !ilink_dir.is_dir() {
             continue;
         }
-        if let Ok(uin) = read_uin_from_ilink(ilink_dir, suffix.as_deref()) {
+        if let Ok(uin) = read_uin_from_ilink(ilink_dir, suffix.as_deref(), false) {
             return Ok(uin);
         }
     }
 
-    Err(MediaError::NotFound(format!(
-        "no config.ini with last_uin found (searched {} candidate paths)",
-        candidates.len()
-    )))
+    if let Some((ilink_dir, suffix)) = windows_ilink.zip(suffix.as_deref()) {
+        if ilink_dir.is_dir() {
+            return read_uin_from_ilink(ilink_dir, Some(suffix), true);
+        }
+    }
+
+    Err(MediaError::NotFound(
+        "no account config.ini with last_uin found".into(),
+    ))
 }
 
 /// Extract the 4-char account hash suffix from a directory name.
@@ -108,24 +127,25 @@ fn extract_account_suffix(dir_name: &str) -> Option<String> {
 fn read_uin_from_ilink(
     ilink_dir: &Path,
     account_suffix: Option<&str>,
+    require_match: bool,
 ) -> Result<String, MediaError> {
+    let matches_account = |entry: &std::fs::DirEntry| {
+        let name = entry.file_name();
+        account_suffix.is_some_and(|suffix| {
+            name.to_str()
+                .and_then(|name| name.get(..suffix.len()))
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(suffix))
+        })
+    };
     let mut entries: Vec<_> = std::fs::read_dir(ilink_dir)?
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
+        .filter(|entry| !require_match || matches_account(entry))
         .collect();
 
-    // Sort: matching-suffix directories first
-    if let Some(suffix) = account_suffix {
-        entries.sort_by_key(|e| {
-            let name = e.file_name().to_string_lossy().to_string();
-            if name.starts_with(suffix) {
-                0
-            } else {
-                1
-            }
-        });
-    }
+    entries.sort_by_key(|entry| !matches_account(entry));
 
+    let mut matched_uin = None;
     for entry in entries {
         let config_path = entry.path().join("kvcomm").join("config.ini");
         if !config_path.is_file() {
@@ -133,13 +153,21 @@ fn read_uin_from_ilink(
         }
         let content = std::fs::read_to_string(&config_path)?;
         if let Some(uin) = parse_uin_from_config(&content) {
-            return Ok(uin);
+            if !require_match {
+                return Ok(uin);
+            }
+            if matched_uin.as_ref().is_some_and(|matched| matched != &uin) {
+                return Err(MediaError::InvalidFormat {
+                    reason: "multiple Windows image configurations match this account".into(),
+                });
+            }
+            matched_uin = Some(uin);
         }
     }
 
-    Err(MediaError::NotFound(
-        "no config.ini with last_uin found in ilink directory".into(),
-    ))
+    matched_uin.ok_or_else(|| {
+        MediaError::NotFound("no matching config.ini with last_uin found in ilink directory".into())
+    })
 }
 
 /// Parse `last_uin=<base64>` from config.ini content and return the decoded UIN.
@@ -176,6 +204,32 @@ pub fn derive_v2_key_from_dir(data_dir: &Path) -> Result<[u8; 16], MediaError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn windows_ilink_selects_only_unambiguous_account_configs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let data_dir = tmp.path().join("xwechat_files/wxid_test_ab12");
+        let ilink = tmp.path().join("AppData/Tencent/xwechat/radium/ilink");
+        let write_config = |name: &str, uin: &str| {
+            let directory = ilink.join(name).join("kvcomm");
+            std::fs::create_dir_all(&directory).unwrap();
+            std::fs::write(directory.join("config.ini"), format!("last_uin={uin}\n")).unwrap();
+        };
+        write_config("c3e70000", "OTk5");
+        assert!(read_uin_with_windows_ilink(&data_dir, Some(&ilink)).is_err());
+
+        write_config("AB120000", "MTIz");
+        assert_eq!(
+            read_uin_with_windows_ilink(&data_dir, Some(&ilink)).unwrap(),
+            "123"
+        );
+
+        write_config("ab120001", "OTk5");
+        assert!(matches!(
+            read_uin_with_windows_ilink(&data_dir, Some(&ilink)),
+            Err(MediaError::InvalidFormat { .. })
+        ));
+    }
 
     #[test]
     fn test_parse_uin_from_config_valid() {

@@ -15,6 +15,7 @@ wx-cli 直接读取 Windows 上的微信本地数据，让你和 Agent 都能访
 - **一次读取跨会话时间线**：按时间范围取得所有会话的新消息，适合记忆补全、归档和日报任务。
 - **实时订阅新消息**：用命令行持续监听，或通过 SSE 把新消息实时推给 Agent 和其他程序。
 - **导出与处理内容**：把会话导出为 JSON 或文本，并读取图片、语音、视频等媒体内容。
+- **理解群聊图片**：按群名和时间范围批量描述图片，或指定一条图片消息提问；需配置支持视觉输入的 OpenAI 兼容 API，此命令会上传所选图片。
 - **让 Agent 直接使用**：项目自带 Agent Skill，Claude Code、Codex、Cursor 等工具安装后就知道怎样查询和订阅微信。
 - **提供稳定的本地服务**：REST API 可供个人助理、自动化任务、工作流和多个 Agent 共同使用。
 - **保护不想暴露的内容**：可隐藏指定联系人、群聊、标签或群成员；查询、导出和订阅时自动过滤（全文搜索暂不应用隐藏规则）。
@@ -180,6 +181,10 @@ wx-cli media extract-voice --media-dir <dir> <svr_id> -o voice.mp3    # 提取�
 wx-cli media decrypt-video encrypted.bin --seed 2105122989 -o video.mp4  # 解密视频号视频
 ```
 
+Windows 上，`decode-image -d` 可以从本机微信配置推导 V2 图片密钥。
+会话导出、媒体 API 和 `recognize-images` 优先使用 `key set-image` 保存的密钥，否则尝试自动推导。
+图片需要已经下载到本机。
+
 ### 6. HTTP API 服务
 
 ```powershell
@@ -201,6 +206,37 @@ REST 端点：`/api/v1/health`、`/api/v1/sessions`、`/api/v1/contacts`、`/api
 所有查询命令加 `--format json` 可获取 JSON 格式输出。
 
 ## 命令一览
+
+### 群聊图片理解与问答
+
+`recognize-images` 读取本机已有的群聊图片，解密后调用 OpenAI 兼容的
+`POST <Base URL>/chat/completions`。选择的模型必须支持 `image_url` 图片输入，
+纯文本模型不可用。三个环境变量均必填；Base URL 填 API 根地址（通常以 `/v1` 结尾），
+不要包含 `/chat/completions`。接口结构参考 [官方视觉文档](https://developers.openai.com/api/docs/guides/images-vision)。
+
+```powershell
+$env:WX_CLI_VISION_BASE_URL = "https://你的服务商地址/v1"
+$env:WX_CLI_VISION_MODEL = "你的视觉模型名称"
+# 在本机设置密钥，不要提交到源码或公开粘贴
+$env:WX_CLI_VISION_API_KEY = "你的 API Key"
+
+# 指定单条图片消息，可先用 query 群名 --type image --format json 查 server_id
+wx-cli recognize-images "群名" --server-id 123456789 --question "这张图主要讲了什么？"
+
+# 按本地时区计算时间边界，传入 Unix 秒；批量模式必须指定起止时间
+$start = [DateTimeOffset]::new([datetime]"2026-11-18 00:00:00").ToUnixTimeSeconds()
+$end = [DateTimeOffset]::new([datetime]"2026-11-18 23:59:59").ToUnixTimeSeconds()
+wx-cli recognize-images "群名" --since $start --until $end --limit 20 --format json -o images.json
+```
+
+- 支持群名或 `@chatroom` ID，沿用联系人歧义检查和隐藏规则；支持 `--account`、`-d/--data-dir`。
+- 默认描述图片，也可用 `--question` 逐张提问。每张图片独立分析，不发送其他聊天文本、群名或发送者信息给模型。
+- 按最新消息优先处理，默认最多 20 条，`--limit` 范围 1–200；超过上限会提示，可缩小时间范围分批处理。同一批次的相同图片复用成功结果。
+- 输出包含消息 ID、时间、发送者、`quality`（`full` 或 `thumbnail`）、回答或逐项错误。`full` 表示本地非缩略图候选，不保证是微信原图；缩略图可能看不清小字。
+- 支持 JPEG、PNG、WebP；WXGF 在 FFmpeg 能成功转码时可用。GIF 等格式会明确报错。单图上限 20 MiB，单次请求超时 120 秒。
+- 图片必须已下载到本机；缺失时需先在微信里打开并下载。部分项目失败仍输出其他结果，退出码为非零；不会自动重试收费请求。
+- 只有显式执行此命令才上传图片及问题，并可能产生服务商费用。普通查询、导出和本地服务不会自动调用模型。API 要求 HTTPS，本机测试允许 localhost HTTP。
+- 当前提供 CLI，不包含实时自动识别、识别结果全文索引或新的 HTTP 识别端点。模型描述可能有误，应对关键信息人工核对。
 
 ### 导出收藏表情包
 

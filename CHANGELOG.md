@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Add Weixin 4.1.15.13 x64 capture configuration with an entry signature check before installing a breakpoint. Locally validated key capture during login and fresh message queries; not released yet. Some auxiliary/media databases can still lack keys.
+## [0.7.9] - 2026-11-27
+
+- Resolve Windows V2 image keys from the local Weixin account configuration when no image key is saved. Export, the media API, and image recognition now share this lookup.
+- Add `recognize-images` to describe downloaded group images or ask about a specific image using a configured vision API. This command sends the selected images to that API.
+- Add resumable export of favorite stickers.
+- Release locally validated key capture support for Windows x64 Weixin 4.1.15.13. Some auxiliary and media databases may still lack keys.
+- Verify local image export on Windows x64 with Weixin 4.2.1.10 and existing database keys. Fresh database key extraction is still unsupported on 4.2.1.10. Full-size WXGF images may require FFmpeg for conversion.
+
+The Windows x64 archive contains an unsigned executable. Microsoft Defender or SmartScreen may warn about it.
 
 ## [0.7.8] - 2026-09-18
 

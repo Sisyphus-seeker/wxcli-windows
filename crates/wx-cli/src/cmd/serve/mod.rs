@@ -187,7 +187,7 @@ pub async fn cmd_serve(
     let file_dir = acct.data_dir.join("msg").join("file");
     let video_dir = acct.data_dir.join("msg").join("video");
     let dat_decrypt = wx_media::DatDecryptOptions {
-        v2_aes_key: wx_media::derive_v2_key_from_dir(&acct.data_dir).ok(),
+        v2_aes_key: super::media::account_image_key(&acct),
         xor_key: None,
     };
     let media_db_dir = if direct_mode {

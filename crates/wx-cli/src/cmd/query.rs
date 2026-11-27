@@ -133,7 +133,7 @@ pub fn cmd_query(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn load_local_query(
+pub(super) fn load_local_query(
     contact: &str,
     data_dir: Option<PathBuf>,
     account: Option<String>,
