@@ -255,9 +255,8 @@ pub fn cmd_export(
         let decrypted_media = c.decrypted_root().join("message");
         let hardlink_db = c.decrypted_root().join("hardlink").join("hardlink.db");
 
-        let v2_aes_key = wx_media::derive_v2_key_from_dir(&acct.data_dir).ok();
         let dat_opts = wx_media::DatDecryptOptions {
-            v2_aes_key,
+            v2_aes_key: super::media::account_image_key(&acct),
             xor_key: None,
         };
 

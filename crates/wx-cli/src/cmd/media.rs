@@ -3,6 +3,18 @@ use std::path::PathBuf;
 use crate::util::walkdir_dat_files;
 use crate::MediaAction;
 
+pub(super) fn account_image_key(acct: &wx_context::AccountContext) -> Option<[u8; 16]> {
+    wx_keychain::KeyStore::load_default()
+        .ok()
+        .and_then(|store| {
+            hex::decode(store.get(&acct.account_id)?.image_aes_key.as_deref()?)
+                .ok()?
+                .try_into()
+                .ok()
+        })
+        .or_else(|| wx_media::derive_v2_key_from_dir(&acct.data_dir).ok())
+}
+
 pub fn cmd_media(action: MediaAction) -> Result<(), Box<dyn std::error::Error>> {
     match action {
         MediaAction::DecryptDat {
@@ -46,8 +58,7 @@ pub fn cmd_media(action: MediaAction) -> Result<(), Box<dyn std::error::Error>> 
             } else if let Some(ref dir) = data_dir {
                 let key = wx_media::derive_v2_key_from_dir(dir)
                     .map_err(|e| format!("V2 key derivation from --data-dir failed: {e}"))?;
-                let key_preview = String::from_utf8_lossy(&key[..8]);
-                eprintln!("Derived V2 key from UIN+WXID: {key_preview}...");
+                eprintln!("Derived V2 image key from local WeChat configuration");
                 Some(key)
             } else {
                 None

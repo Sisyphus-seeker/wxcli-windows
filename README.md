@@ -181,6 +181,10 @@ wx-cli media extract-voice --media-dir <dir> <svr_id> -o voice.mp3    # 提取�
 wx-cli media decrypt-video encrypted.bin --seed 2105122989 -o video.mp4  # 解密视频号视频
 ```
 
+Windows 上，`decode-image -d` 可以从本机微信配置推导 V2 图片密钥。
+会话导出、媒体 API 和 `recognize-images` 优先使用 `key set-image` 保存的密钥，否则尝试自动推导。
+图片需要已经下载到本机。
+
 ### 6. HTTP API 服务
 
 ```powershell

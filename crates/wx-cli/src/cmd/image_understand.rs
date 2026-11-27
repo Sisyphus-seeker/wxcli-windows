@@ -283,19 +283,13 @@ pub fn run(args: ImageArgs) -> Result<()> {
     if envelope.paging.has_more && args.server_id.is_none() {
         eprintln!("warning: batch limited to latest {} image messages; increase --limit or narrow time range", args.limit);
     }
-    let store = wx_keychain::KeyStore::load_default()?;
-    let stored_key = store
-        .get(&acct.account_id)
-        .and_then(|e| e.image_aes_key.as_ref())
-        .and_then(|s| hex::decode(s).ok())
-        .and_then(|b| <[u8; 16]>::try_from(b).ok());
     let talker = &envelope.items[0].message.talker;
     let attach = acct
         .data_dir
         .join("msg/attach")
         .join(format!("{:x}", wx_media::md5_hash(talker.as_bytes())));
     let opts = wx_media::DatDecryptOptions {
-        v2_aes_key: stored_key.or_else(|| wx_media::derive_v2_key_from_dir(&acct.data_dir).ok()),
+        v2_aes_key: super::media::account_image_key(&acct),
         xor_key: wx_media::detect_xor_key(&attach),
     };
     eprintln!(
