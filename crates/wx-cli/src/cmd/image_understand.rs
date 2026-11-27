@@ -102,10 +102,11 @@ impl VisionClient {
             endpoint: completion_url(&required("WX_CLI_VISION_BASE_URL")?)?,
             key: required("WX_CLI_VISION_API_KEY")?,
             model: required("WX_CLI_VISION_MODEL")?,
-            agent: ureq::AgentBuilder::new()
-                .redirects(0)
-                .timeout(Duration::from_secs(120))
-                .build(),
+            agent: ureq::Agent::config_builder()
+                .max_redirects(0)
+                .timeout_global(Some(Duration::from_secs(120)))
+                .build()
+                .new_agent(),
         })
     }
 
@@ -116,10 +117,10 @@ impl VisionClient {
         let response = self
             .agent
             .post(self.endpoint.as_str())
-            .set("Authorization", &format!("Bearer {}", self.key))
+            .header("Authorization", &format!("Bearer {}", self.key))
             .send_json(request)
             .map_err(|e| match e {
-                ureq::Error::Status(status, _) => format!("vision API returned HTTP {status}"),
+                ureq::Error::StatusCode(status) => format!("vision API returned HTTP {status}"),
                 _ => "vision API connection failed or timed out".to_string(),
             })?;
         if response.status() != 200 {
@@ -127,6 +128,7 @@ impl VisionClient {
         }
         let mut bytes = Vec::new();
         response
+            .into_body()
             .into_reader()
             .take(2 * 1024 * 1024 + 1)
             .read_to_end(&mut bytes)?;
@@ -489,11 +491,12 @@ mod tests {
                 endpoint: completion_url(&format!("http://{address}/v1")).unwrap(),
                 key: "mock-secret".into(),
                 model: "mock-vision".into(),
-                agent: ureq::AgentBuilder::new()
-                    .try_proxy_from_env(false)
-                    .redirects(0)
-                    .timeout(Duration::from_secs(5))
-                    .build(),
+                agent: ureq::Agent::config_builder()
+                    .proxy(None)
+                    .max_redirects(0)
+                    .timeout_global(Some(Duration::from_secs(5)))
+                    .build()
+                    .new_agent(),
             },
             handle,
         )

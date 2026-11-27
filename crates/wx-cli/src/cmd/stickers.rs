@@ -118,6 +118,7 @@ fn download(agent: &ureq::Agent, item: &Sticker) -> Result<Vec<u8>> {
                     .map_err(|_| "Download request failed")?;
                 let mut data = Vec::new();
                 response
+                    .into_body()
                     .into_reader()
                     .take(MAX_BYTES + 1)
                     .read_to_end(&mut data)?;
@@ -152,9 +153,10 @@ fn download(agent: &ureq::Agent, item: &Sticker) -> Result<Vec<u8>> {
 pub fn run(args: StickerArgs) -> Result<()> {
     let items = load(&args)?;
     std::fs::create_dir_all(&args.output)?;
-    let agent = ureq::AgentBuilder::new()
-        .timeout(Duration::from_secs(30))
-        .build();
+    let agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(30)))
+        .build()
+        .new_agent();
     let mut seen = HashSet::new();
     let mut report = Vec::new();
     let mut failed = 0;
@@ -245,7 +247,10 @@ mod tests {
         };
         assert_eq!(
             download(
-                &ureq::AgentBuilder::new().try_proxy_from_env(false).build(),
+                &ureq::Agent::config_builder()
+                    .proxy(None)
+                    .build()
+                    .new_agent(),
                 &item
             )
             .unwrap(),
